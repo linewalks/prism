@@ -34,10 +34,8 @@ dataset["hour"]=\
 dataset["MEASUREMENT_DATETIME(new)"].dt.hour
 
 group1=dataset.groupby(['PERSON_ID','MEASUREMENT_DATE','hour'])
-group_
 
 dataset["VALUE_SOURCE_VALUE"]
-
 dataset["MEASUREMENT_SOURCE_VALUE"]
 
 actual_list[0]
@@ -93,7 +91,7 @@ for code in actual_list[1:]:
 
 
 dataset3=pd.read_csv("./sample_condition_occurrence_table.csv",encoding='ms949')
-dataset3[["CONDITION_START_DATETIME"]].apply(lambda x:pd.to_datetime(x))
+dataset3[["CONDITION_START_DATE"]].apply(lambda x:pd.to_datetime(x))
 dataset4=pd.read_csv("../진단코드_목록.csv", encoding='ms949')
 
 condition1=dataset4['CONDITION_SOURCE_VALUE'].unique()
@@ -103,7 +101,12 @@ for i in range(len(condition1)):
 dataset3['CONDITION_START_DATE']=dataset3['CONDITION_START_DATE'].apply(lambda x:pd.to_datetime(x))
 
 datasetn=pd.concat([dataset3[["PERSON_ID","CONDITION_START_DATE"]],dataset3[condition1]],axis=1)
-datasetn=datasetn.fillna(0)
+
 HR=HR.reset_index()
+HR["MEASUREMENT_DATE"]=HR["MEASUREMENT_DATE"].apply(lambda x:pd.to_datetime(x))
 total=HR.merge(datasetn, left_on=["PERSON_ID","MEASUREMENT_DATE"],
          right_on=["PERSON_ID","CONDITION_START_DATE"], how='left')
+
+total[condition1]=total.groupby(['PERSON_ID'])[condition1].ffill().iloc[:,1:]
+
+total[condition1]=total[condition1].fillna(0)

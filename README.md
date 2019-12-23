@@ -1,6 +1,12 @@
 # prism
 
-# data validation check
+## clone repository
+
+```
+git clone https://github.com/hurcy/prism
+```
+
+## validation data
 
 ```
 cp condition_occurrence.csv data/train
@@ -8,13 +14,13 @@ cp measurement.csv data/train
 cp person.csv data/train
 ```
 
-# docker build
+## docker build
 
 ```
 ./build.sh
 ```
 
-# docker run
+## docker run
 
 ```
 ./run.sh

@@ -11,5 +11,6 @@ data_loader = DataLoader(data_path=data_path)
 model = SimpleRNNModel(data_loader)
 
 model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
+            verbose=1,
             epochs=10, batch_size=32)
 

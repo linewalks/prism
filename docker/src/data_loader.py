@@ -70,14 +70,14 @@ class DataLoader:
     self.split_data()
 
   def extract_outcome_cohort(self):
-    cohort_df = pd.read_csv(os.path.join(self.data_path, 'OUTCOME_COHORT.csv'))
+    cohort_df = pd.read_csv(os.path.join(self.data_path, 'OUTCOME_COHORT.csv'), encoding='windows-1252')
 
     cohort_df.COHORT_START_DATE = pd.to_datetime(cohort_df.COHORT_START_DATE)
     cohort_df.COHORT_END_DATE = pd.to_datetime(cohort_df.COHORT_END_DATE)
     return cohort_df
 
   def extract_person(self):
-    person_df = pd.read_csv(os.path.join(self.data_path, 'PERSON_NICU.csv'))
+    person_df = pd.read_csv(os.path.join(self.data_path, 'PERSON_NICU.csv'), encoding='windows-1252')
     person_df = pd.concat([
         person_df[['PERSON_ID', 'BIRTH_DATETIME']],
         pd.get_dummies(person_df.GENDER_SOURCE_VALUE, prefix='gender')
@@ -85,7 +85,7 @@ class DataLoader:
     return person_df
 
   def extract_condition(self):
-    condition_df = pd.read_csv(os.path.join(self.data_path, 'CONDITION_OCCURRENCE_NICU.csv'))
+    condition_df = pd.read_csv(os.path.join(self.data_path, 'CONDITION_OCCURRENCE_NICU.csv'), encoding='windows-1252')
     # Null 이거나 값이 빈 것을 날림
     condition_df = condition_df[pd.notnull(condition_df.CONDITION_SOURCE_VALUE)]
     condition_df = condition_df[condition_df.CONDITION_SOURCE_VALUE.str.len() > 0]
@@ -98,7 +98,7 @@ class DataLoader:
     return condition_df
 
   def extract_measurement(self):
-    measurement_df = pd.read_csv(os.path.join(self.data_path, 'MEASUREMENT_NICU.csv'))
+    measurement_df = pd.read_csv(os.path.join(self.data_path, 'MEASUREMENT_NICU.csv'), encoding='windows-1252')
 
     # source_value 맵핑
     source_value_invert_map = {}
@@ -208,28 +208,34 @@ class DataLoader:
     self.key = pd.DataFrame(key_list, columns=['SUBJECT_ID', 'COHORT_END_DATE'])
 
   def split_data(self):
-    try:
-      train_patient, valid_patient = train_test_split(self.key.SUBJECT_ID.unique(),
-                                                      test_size=self.valid_size,
-                                                      random_state=self.data_split_random_seed)
+    if self.is_train:
+      try:
+        train_patient, valid_patient = train_test_split(self.key.SUBJECT_ID.unique(),
+                                                        test_size=self.valid_size,
+                                                        random_state=self.data_split_random_seed)
 
-      self.train_x = self.x[self.key.SUBJECT_ID.isin(train_patient)]
-      self.train_y = self.y[self.key.SUBJECT_ID.isin(train_patient)]
+        self.train_x = self.x[self.key.SUBJECT_ID.isin(train_patient)]
+        self.train_y = self.y[self.key.SUBJECT_ID.isin(train_patient)]
 
-      self.valid_x = self.x[self.key.SUBJECT_ID.isin(valid_patient)]
-      self.valid_y = self.y[self.key.SUBJECT_ID.isin(valid_patient)]
-    except ValueError:                                      # is sample data
-      self.train_x = self.x
-      self.train_y = self.y
+        self.valid_x = self.x[self.key.SUBJECT_ID.isin(valid_patient)]
+        self.valid_y = self.y[self.key.SUBJECT_ID.isin(valid_patient)]
+      except ValueError:                                      # is sample data
+        self.train_x = self.x
+        self.train_y = self.y
 
-      self.valid_x = self.x
-      self.valid_y = self.y
+        self.valid_x = self.x
+        self.valid_y = self.y
 
-    self.train_x = pad_sequences(self.train_x)
-    self.valid_x = pad_sequences(self.valid_x)
+      self.train_x = pad_sequences(self.train_x)
+      self.valid_x = pad_sequences(self.valid_x)
+    else:
+      self.train_x = pad_sequences(self.x)
 
   def get_train_data(self):
     return self.train_x, self.train_y
 
   def get_valid_data(self):
     return self.valid_x, self.valid_y
+
+  def get_infer_data(self):
+    return self.train_x

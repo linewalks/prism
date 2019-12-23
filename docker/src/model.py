@@ -1,8 +1,10 @@
+import os
+import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import GRU, Input, Masking, Dropout, Dense, Activation
 from tensorflow.keras.initializers import TruncatedNormal
 from tensorflow.keras.optimizers import Adam
-
+from tensorflow.keras.models import load_model
 
 
 class SimpleRNNModel:
@@ -38,10 +40,22 @@ class SimpleRNNModel:
 
     self.model = model
 
-  def train(self, train_data, valid_data, epochs=10, verbose=0, batch_size=32):
+  def load(self, path):
+    model_path = tf.train.latest_checkpoint(path)
+    if model_path is None:
+      file_name = sorted([file_name for file_name in os.listdir(path) if file_name.endswith('.hdf5')])[-1]
+      model_path = os.path.join(path, file_name)
+    
+    self.model = load_model(model_path)
+
+  def train(self, train_data, valid_data, epochs=10, verbose=0, batch_size=32, callbacks=[]):
     self.model.fit(train_data[0], train_data[1],
                    epochs=epochs,
                    verbose=verbose,
                    batch_size=batch_size,
-                   validation_data=valid_data
+                   validation_data=valid_data,
+                   callbacks=callbacks
                    )
+  
+  def predict(self, infer_x):
+    return self.model.predict(infer_x)

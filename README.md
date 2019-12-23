@@ -26,4 +26,8 @@ cp person.csv data/train
 ./run.sh
 ```
 
+## docker export
 
+```
+./zip.sh
+```

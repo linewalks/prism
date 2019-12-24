@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -70,21 +71,26 @@ class DataLoader:
     self.split_data()
 
   def extract_outcome_cohort(self):
+    start_time = time.time()
     cohort_df = pd.read_csv(os.path.join(self.data_path, 'OUTCOME_COHORT.csv'), encoding='windows-1252')
 
     cohort_df.COHORT_START_DATE = pd.to_datetime(cohort_df.COHORT_START_DATE)
     cohort_df.COHORT_END_DATE = pd.to_datetime(cohort_df.COHORT_END_DATE)
+    print("data_loader extract_outcome_cohort time:", time.time()-start_time)
     return cohort_df
 
   def extract_person(self):
+    start_time = time.time()
     person_df = pd.read_csv(os.path.join(self.data_path, 'PERSON_NICU.csv'), encoding='windows-1252')
     person_df = pd.concat([
         person_df[['PERSON_ID', 'BIRTH_DATETIME']],
         pd.get_dummies(person_df.GENDER_SOURCE_VALUE, prefix='gender')
     ], axis=1)
+    print("data_loader extract_person time:", time.time()-start_time)
     return person_df
 
   def extract_condition(self):
+    start_time = time.time()
     condition_df = pd.read_csv(os.path.join(self.data_path, 'CONDITION_OCCURRENCE_NICU.csv'), encoding='windows-1252')
     # Null 이거나 값이 빈 것을 날림
     condition_df = condition_df[pd.notnull(condition_df.CONDITION_SOURCE_VALUE)]
@@ -95,9 +101,11 @@ class DataLoader:
 
     # 필요 컬럼만 사용
     condition_df = condition_df[['PERSON_ID', 'CONDITION_SOURCE_VALUE', 'CONDITION_START_DATETIME']]
+    print("data_loader extract_condition time:", time.time()-start_time)
     return condition_df
 
   def extract_measurement(self):
+    start_time = time.time()
     measurement_df = pd.read_csv(os.path.join(self.data_path, 'MEASUREMENT_NICU.csv'), encoding='windows-1252')
 
     # source_value 맵핑
@@ -115,6 +123,7 @@ class DataLoader:
 
     # 필요 컬럼만 사용
     measurement_df = measurement_df[['PERSON_ID', 'MEASUREMENT_DATETIME', 'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']]
+    print("data_loader extract_measurement time:", time.time()-start_time)
     return measurement_df
 
   def groupby_hour(self):
@@ -122,11 +131,14 @@ class DataLoader:
     self.measurement_df = self.groupby_hour_measurement(self.measurement_df)
 
   def groupby_hour_condition(self, condition_df):
+    start_time = time.time()
     condition_df["CONDITION_HOUR"] = condition_df.CONDITION_START_DATETIME.dt.hour
     condition_df["CONDITION_DATE"] = condition_df.CONDITION_START_DATETIME.dt.date
+    print("data_loader groupby_hour_condition time:", time.time()-start_time)
     return condition_df
 
   def groupby_hour_measurement(self, measurement_df):
+    start_time = time.time()
     measurement_df['MEASUREMENT_DATE'] = measurement_df.MEASUREMENT_DATETIME.dt.date
     measurement_df['MEASUREMENT_HOUR'] = measurement_df.MEASUREMENT_DATETIME.dt.hour
     measurement_df['MEASUREMENT_HOURGRP'] = measurement_df.MEASUREMENT_HOUR // self.group_hour
@@ -136,9 +148,11 @@ class DataLoader:
                                    .VALUE_AS_NUMBER.agg(['count', 'min', 'max', 'mean', 'std', 'var'])
 
     measurement_df = measurement_df.unstack().reset_index().fillna(0)
+    print("data_loader groupby_hour_measurement time:", time.time()-start_time)
     return measurement_df
 
   def make_data(self):
+    start_time = time.time()
     # 빠른 서치를 위하여 데이터 정렬
     # 가장 마지막 시점이 먼저 오도록 반대로 정렬
     cohort_df = self.cohort_df.sort_values(['SUBJECT_ID', 'COHORT_END_DATE'], ascending=[True, False])
@@ -207,7 +221,10 @@ class DataLoader:
     self.y = np.array(y_list) if self.is_train else None
     self.key = pd.DataFrame(key_list, columns=['SUBJECT_ID', 'COHORT_END_DATE'])
 
+    print("data_loader make_data time:", time.time()-start_time)
+
   def split_data(self):
+    start_time = time.time()
     if self.is_train:
       try:
         train_patient, valid_patient = train_test_split(self.key.SUBJECT_ID.unique(),
@@ -230,6 +247,8 @@ class DataLoader:
       self.valid_x = pad_sequences(self.valid_x)
     else:
       self.train_x = pad_sequences(self.x)
+
+    print("data_loader split_data time:", time.time()-start_time)
 
   def get_train_data(self):
     return self.train_x, self.train_y

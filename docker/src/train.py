@@ -1,10 +1,12 @@
 import os
 import sys
+import numpy as np
 import pandas as pd
 
 from data_loader import DataLoader
 from model import SimpleRNNModel
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
+from sklearn.metrics import f1_score
 
 data_path = sys.argv[1]
 
@@ -34,8 +36,8 @@ callbacks = [
                     save_weights_only=False,
                     verbose=True
     ),
-    TensorBoard(log_dir=os.path.join(data_path, 'volume', 'logs'),
-    write_graph=True
+    TensorBoard(log_dir=task_log_path,
+                write_graph=True
     )
 ]
 
@@ -44,3 +46,19 @@ model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             epochs=10, batch_size=32,
             callbacks=callbacks)
 
+# Valid F1 score가 가장 잘나오는 베스트 
+
+valid_x, valid_y = data_loader.get_valid_data()
+y_pred = model.predict(valid_x)
+
+f1_list = []
+thr_list = []
+for thr in np.linspace(0, 1, 100):
+  f1_list.append(f1_score(valid_y, y_pred > thr))
+  thr_list.append(thr)
+
+thr_idx = np.argmax(f1_list)
+print("Best Valid F1", np.max(f1_list), thr_list[thr_idx])
+
+np.save(os.path.join(task_path, 'f1.npy'), f1_list)
+np.save(os.path.join(task_path, 'thr.npy'), thr_list)

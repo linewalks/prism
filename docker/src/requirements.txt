@@ -1,4 +1,5 @@
 pip==19.3
 pandas
 pytest
+scikit-learn
 dotmap

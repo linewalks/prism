@@ -1,4 +1,3 @@
 #!/usr/bin/env bash
 
-python src/inference.py
-
+python src/inference.py /data/

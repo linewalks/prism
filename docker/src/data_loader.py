@@ -197,11 +197,11 @@ class DataLoader:
         feature_date = feature_row[1]
         feature_hourgrp = feature_row[2]
 
-        measurement_datetime = datetime(feature_date.year,
-                                        feature_date.month,
-                                        feature_date.day,
-                                        feature_hourgrp * self.group_hour)
-        if person_id == subject_id and measurement_datetime < cohort_end_date:
+        feature_datetime = datetime(feature_date.year,
+                                    feature_date.month,
+                                    feature_date.day,
+                                    feature_hourgrp * self.group_hour)
+        if person_id == subject_id and feature_datetime < cohort_end_date:
           # 같은 환자이고 cohort_end_date보다 먼저 발생한 데이터이면
           # 맞는 데이터
           each_x_list = []

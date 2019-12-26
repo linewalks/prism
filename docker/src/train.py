@@ -6,7 +6,7 @@ import pandas as pd
 from data_loader import DataLoader
 from model import SimpleRNNModel
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, roc_auc_score
 
 data_path = sys.argv[1]
 
@@ -42,8 +42,8 @@ callbacks = [
 ]
 
 model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
-            verbose=1,
-            epochs=10, batch_size=32,
+            verbose=0,
+            epochs=20, batch_size=32,
             callbacks=callbacks)
 
 # Valid F1 score가 가장 잘나오는 베스트 
@@ -59,6 +59,7 @@ for thr in np.linspace(0, 1, 100):
 
 thr_idx = np.argmax(f1_list)
 print("Best Valid F1", np.max(f1_list), thr_list[thr_idx])
+print("Valid AUROC", roc_auc_score(valid_y, y_pred))
 
 np.save(os.path.join(task_path, 'f1.npy'), f1_list)
 np.save(os.path.join(task_path, 'thr.npy'), thr_list)

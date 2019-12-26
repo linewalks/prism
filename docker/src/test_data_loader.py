@@ -18,3 +18,5 @@ class Test_DataLoader():
 
   def test_make_data(self):
     data_loader.make_data()
+    assert data_loader.x.shape[1:] == (128, 72)
+    assert data_loader.y.shape[0] == data_loader.x.shape[0]

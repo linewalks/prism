@@ -157,6 +157,13 @@ class DataLoader:
                                    .VALUE_AS_NUMBER.agg(['count', 'min', 'max', 'mean', 'std', 'var'])
 
     measurement_df = measurement_df.unstack().reset_index().fillna(0)
+    new_cols = []
+    for col in  measurement_df.columns:
+      if col[1] == '':
+        new_cols.append(col[0])
+      else:
+        new_cols.append(col)
+    measurement_df.columns = new_cols
     print("data_loader groupby_hour_measurement time:", time.time() - start_time)
     return measurement_df
 
@@ -169,11 +176,14 @@ class DataLoader:
     #                                                   ascending=[True, False, False]).values
 
     # timestamp가 가장 세밀한 검진에 진단을 붙임
-    feature_df = pd.merge(self.measurement_df, self.condition_df, how='left',
-                          left_on=['MEASUREMENT_DATE'], right_on=['CONDITION_START_DATETIME'])
+    feature_df = pd.merge(self.measurement_df, self.condition_df.reset_index(), how='left',
+                          left_on=['PERSON_ID', 'MEASUREMENT_DATE'], right_on=['PERSON_ID', 'CONDITION_START_DATETIME'])
+    feature_df = feature_df.drop('CONDITION_START_DATETIME', axis=1)
     # 새로운 진단이 나올때까지 직전의 진단을 유지
     feature_df[self.condition_cols] = feature_df[self.condition_cols].fillna(method='ffill')
 
+    feature_df = feature_df.sort_values(['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP'],
+                                        ascending=[True, False, False])
     feature_ary = feature_df.values
 
     cols = ['SUBJECT_ID', 'COHORT_END_DATE']

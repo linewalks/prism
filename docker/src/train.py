@@ -27,7 +27,9 @@ if not os.path.exists(task_log_path):
 
 print("Train Start")
 
-data_loader = DataLoader(data_path=os.path.join(data_path, 'train'))
+data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
+                         common_path=os.path.join(data_path, 'volume'),
+                         task_path=task_path)
 model = SimpleRNNModel(data_loader)
 
 callbacks = [

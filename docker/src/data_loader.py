@@ -37,14 +37,21 @@ MEASUREMENT_SOURCE_VALUE_MAP = {
 
 
 class DataLoader:
-  def __init__(self, data_path='/data/train', is_train=True,
+  def __init__(self, data_path='/data/train', common_path='/data/volume',
+               task_path='/data/volume/local_test',
+               is_train=True,
                group_hour=1, timestep_per_data=128,
+               measurement_normalize=True,
                valid_size=0.2, data_split_random_seed=1234, pytest=False):
     self.data_path = data_path
+    self.common_path = common_path
+    self.task_path = task_path
     self.is_train = is_train
 
     self.group_hour = group_hour
     self.timestep_per_data = timestep_per_data
+
+    self.measurement_normalize = measurement_normalize
 
     self.valid_size = valid_size
     self.data_split_random_seed = data_split_random_seed
@@ -124,6 +131,15 @@ class DataLoader:
     # 필요 컬럼만 사용
     measurement_df = measurement_df[['PERSON_ID', 'MEASUREMENT_DATETIME',
                                      'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']]
+
+    # source_value별 평균값 추출
+    if self.is_train:
+      self.measurement_mean_df = measurement_df.groupby('MEASUREMENT_SOURCE_VALUE').VALUE_AS_NUMBER.mean()
+      self.measurement_mean_df.to_pickle(os.path.join(self.common_path, 'measurement_mean.pkl'))
+    else:
+      # inference일 경우 저장된 걸 불러온다
+      self.measurement_mean_df = pd.read_pickle(os.path.join(self.common_path, 'measurement_mean.pkl'))
+    
     print("data_loader extract_measurement time:", time.time() - start_time)
     return measurement_df
 
@@ -134,37 +150,58 @@ class DataLoader:
   def groupby_hour_condition(self, condition_df):
     start_time = time.time()
 
-    group_cols = ['PERSON_ID', 'CONDITION_START_DATETIME', 'CONDITION_SOURCE_VALUE']
+    condition_df['CONDITION_DATE'] = condition_df.CONDITION_START_DATETIME.dt.date
+    condition_df['CONDITION_DATE'] = pd.to_datetime(condition_df.CONDITION_DATE, utc=True)
+
+    group_cols = ['PERSON_ID', 'CONDITION_DATE', 'CONDITION_SOURCE_VALUE']
     self.condition_cols = condition_df.CONDITION_SOURCE_VALUE.unique().tolist()
 
     condition_df['DUMMY'] = condition_df['CONDITION_SOURCE_VALUE']
     condition_df = condition_df.groupby(group_cols) \
-                               .DUMMY.count().unstack().fillna(0)
+                               .DUMMY.count().unstack().reset_index().fillna(0)
 
+    # 진단은 시간이 없다. 당일의 마지막에 진단 받은걸로 가정한다
+    condition_df['HOURGRP'] = 23 // self.group_hour
+    
+    condition_df = condition_df.rename(columns={'CONDITION_DATE': 'DATE'})
+    print(condition_df)
     print("data_loader groupby_hour_condition time:", time.time() - start_time)
     return condition_df
 
   def groupby_hour_measurement(self, measurement_df):
     start_time = time.time()
-    measurement_df['MEASUREMENT_DATE'] = measurement_df.MEASUREMENT_DATETIME.dt.date
     # timestamp로 join 하기 위하여 시간 포맷을 utc로 통일
-    measurement_df['MEASUREMENT_DATE'] = pd.to_datetime(measurement_df['MEASUREMENT_DATE'], utc=True)
+    measurement_df['MEASUREMENT_DATE'] = measurement_df.MEASUREMENT_DATETIME.dt.date
+    measurement_df['MEASUREMENT_DATE'] = pd.to_datetime(measurement_df.MEASUREMENT_DATE, utc=True)
 
     measurement_df['MEASUREMENT_HOUR'] = measurement_df.MEASUREMENT_DATETIME.dt.hour
     measurement_df['MEASUREMENT_HOURGRP'] = measurement_df.MEASUREMENT_HOUR // self.group_hour
 
+    # 평균값 이용하여 Normalize
+    if self.measurement_normalize: 
+      measurement_df = pd.merge(measurement_df, 
+                                self.measurement_mean_df.reset_index().rename(columns={'VALUE_AS_NUMBER': 'MEAN_VALUE'}),
+                                on='MEASUREMENT_SOURCE_VALUE', how='left')
+      measurement_df.VALUE_AS_NUMBER = measurement_df.VALUE_AS_NUMBER / measurement_df.MEAN_VALUE
+    
     group_cols = ['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP', 'MEASUREMENT_SOURCE_VALUE']
+    agg_list = ['count', 'min', 'max', 'mean', 'std', 'var']
     measurement_df = measurement_df.groupby(group_cols) \
-                                   .VALUE_AS_NUMBER.agg(['count', 'min', 'max', 'mean', 'std', 'var'])
+                                   .VALUE_AS_NUMBER.agg(agg_list)
 
     measurement_df = measurement_df.unstack().reset_index().fillna(0)
+
+    # 컬럼 이름 정제 (그룹화 하기 쉽게)
     new_cols = []
     for col in  measurement_df.columns:
       if col[1] == '':
         new_cols.append(col[0])
-      else:
-        new_cols.append(col)
+      elif col[0] in agg_list:
+        new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
+
+    measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
+                                                    'MEASUREMENT_HOURGRP': 'HOURGRP'})
     print("data_loader groupby_hour_measurement time:", time.time() - start_time)
     return measurement_df
 
@@ -177,13 +214,14 @@ class DataLoader:
     #                                                   ascending=[True, False, False]).values
 
     # timestamp가 가장 세밀한 검진에 진단을 붙임
-    feature_df = pd.merge(self.measurement_df, self.condition_df.reset_index(), how='left',
-                          left_on=['PERSON_ID', 'MEASUREMENT_DATE'], right_on=['PERSON_ID', 'CONDITION_START_DATETIME'])
-    feature_df = feature_df.drop('CONDITION_START_DATETIME', axis=1)
+    feature_df = pd.merge(self.measurement_df, self.condition_df, how='left',
+                          on=['PERSON_ID', 'DATE', 'HOURGRP'])
+
     # 새로운 진단이 나올때까지 직전의 진단을 유지
     feature_df[self.condition_cols] = feature_df[self.condition_cols].fillna(method='ffill')
+    feature_df = feature_df.fillna(0)
 
-    feature_df = feature_df.sort_values(['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP'],
+    feature_df = feature_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'],
                                         ascending=[True, False, False])
     feature_ary = feature_df.values
 

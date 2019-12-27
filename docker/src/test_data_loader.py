@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 from data_loader import DataLoader
 
 data_path = '../data/'
@@ -19,12 +20,26 @@ class Test_DataLoader():
 
   def test_make_data(self):
     data_loader.make_data()
-    assert data_loader.x[0][0].shape == (60,)
+    assert data_loader.x[0][0].shape == (72,)
     assert data_loader.y.shape[0] == data_loader.x.shape[0]
 
   def test_split_data(self):
     data_loader.split_data()
     _, train_y = data_loader.get_train_data()
     _, valid_y = data_loader.get_valid_data()
+
+    idx_true_label = np.where(data_loader.y == 1)[0]
+    assert data_loader.y.sum() == data_loader.y[idx_true_label].sum()
     assert np.array_equal(np.unique(train_y), np.array([0, 1]))
     assert np.array_equal(np.unique(valid_y), np.array([0, 1]))
+
+  def test_split_data_shuffle(self):
+    n = 10
+    n_true = 2
+    data_loader.x = pd.DataFrame(np.arange(n), columns=['SUBJECT_ID'])
+    data_loader.key = data_loader.x
+    data_loader.y = np.concatenate([np.zeros(n - n_true), np.ones(n_true)])
+
+    data_loader._stratified_shuffle()
+    assert data_loader.train_y.sum() == 1
+    assert data_loader.valid_y.sum() == 1

@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from data_loader import DataLoader
 
 data_path = '../data/'
@@ -18,5 +19,12 @@ class Test_DataLoader():
 
   def test_make_data(self):
     data_loader.make_data()
-    assert data_loader.x[0][0].shape == (72,)
+    assert data_loader.x[0][0].shape == (60,)
     assert data_loader.y.shape[0] == data_loader.x.shape[0]
+
+  def test_split_data(self):
+    data_loader.split_data()
+    _, train_y = data_loader.get_train_data()
+    _, valid_y = data_loader.get_valid_data()
+    assert np.array_equal(np.unique(train_y), np.array([0, 1]))
+    assert np.array_equal(np.unique(valid_y), np.array([0, 1]))

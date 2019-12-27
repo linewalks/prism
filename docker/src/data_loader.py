@@ -55,7 +55,7 @@ class DataLoader:
     self.valid_size = valid_size
     self.data_split_random_seed = data_split_random_seed
     if not self.is_train:
-      self.condition_cols = np.load(os.path.join(self.task_path, 'condition_list.npy'))
+      self.condition_cols = np.load(os.path.join(self.task_path, 'condition_list.npy'), allow_pickle=True)
     else:
       self.condition_cols = []
 

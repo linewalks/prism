@@ -1,5 +1,5 @@
 import os
-from data_loader import DataLoader, CONDITION_LIST
+from data_loader import DataLoader
 
 data_path = '../data/'
 data_loader = DataLoader(data_path=os.path.join(data_path, 'train'), pytest=True)
@@ -18,5 +18,5 @@ class Test_DataLoader():
 
   def test_make_data(self):
     data_loader.make_data()
-    assert data_loader.x[0][0].shape == (244,)
+    assert data_loader.x[0][0].shape == (60,)
     assert data_loader.y.shape[0] == data_loader.x.shape[0]

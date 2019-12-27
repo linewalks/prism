@@ -25,6 +25,8 @@ if not os.path.exists(log_path):
 if not os.path.exists(task_log_path):
   os.mkdir(task_log_path)
 
+print("Train Start")
+
 data_loader = DataLoader(data_path=os.path.join(data_path, 'train'))
 model = SimpleRNNModel(data_loader)
 
@@ -63,3 +65,5 @@ print("Valid AUROC", roc_auc_score(valid_y, y_pred))
 
 np.save(os.path.join(task_path, 'f1.npy'), f1_list)
 np.save(os.path.join(task_path, 'thr.npy'), thr_list)
+
+print("Train Done")

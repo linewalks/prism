@@ -137,8 +137,9 @@ class DataLoader:
     group_cols = ['PERSON_ID', 'CONDITION_START_DATETIME', 'CONDITION_SOURCE_VALUE']
     self.condition_cols = condition_df.CONDITION_SOURCE_VALUE.unique().tolist()
 
-    condition_df = pd.pivot_table(condition_df, index=group_cols[:2],
-                                  columns=group_cols[2], aggfunc=len, fill_value=0)
+    condition_df['DUMMY'] = condition_df['CONDITION_SOURCE_VALUE']
+    condition_df = condition_df.groupby(group_cols) \
+                               .DUMMY.count().unstack().fillna(0)
 
     print("data_loader groupby_hour_condition time:", time.time() - start_time)
     return condition_df

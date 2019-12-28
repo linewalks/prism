@@ -2,7 +2,7 @@ import os
 import time
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
@@ -42,7 +42,7 @@ class DataLoader:
                is_train=True,
                group_hour=1, timestep_per_data=128,
                measurement_normalize=True,
-               valid_size=0.2, data_split_random_seed=1234, pytest=False):
+               valid_size=0.2, data_split_random_seed=1235, pytest=False):
     self.data_path = data_path
     self.common_path = common_path
     self.task_path = task_path
@@ -70,6 +70,9 @@ class DataLoader:
     self.condition_cols = None
     # 데이터를 시간대별로 Group
     self.groupby_hour()
+
+    # 환자별 시간 시퀀스 데이터를 만듦
+    self.make_person_sequence()
 
     # cohort_df에 맞추어 모델에 들어갈 데이터를 만듦
     self.make_data()
@@ -153,18 +156,17 @@ class DataLoader:
     condition_df['CONDITION_DATE'] = condition_df.CONDITION_START_DATETIME.dt.date
     condition_df['CONDITION_DATE'] = pd.to_datetime(condition_df.CONDITION_DATE, utc=True)
 
-    group_cols = ['PERSON_ID', 'CONDITION_DATE', 'CONDITION_SOURCE_VALUE']
+    # 진단은 시간이 없다. 당일의 마지막에 진단 받은걸로 가정한다
+    condition_df['HOURGRP'] = 23 // self.group_hour
+
+    group_cols = ['PERSON_ID', 'CONDITION_DATE', 'HOURGRP', 'CONDITION_SOURCE_VALUE']
     self.condition_cols = condition_df.CONDITION_SOURCE_VALUE.unique().tolist()
 
     condition_df['DUMMY'] = condition_df['CONDITION_SOURCE_VALUE']
     condition_df = condition_df.groupby(group_cols) \
                                .DUMMY.count().unstack().reset_index().fillna(0)
 
-    # 진단은 시간이 없다. 당일의 마지막에 진단 받은걸로 가정한다
-    condition_df['HOURGRP'] = 23 // self.group_hour
-    
     condition_df = condition_df.rename(columns={'CONDITION_DATE': 'DATE'})
-    print(condition_df)
     print("data_loader groupby_hour_condition time:", time.time() - start_time)
     return condition_df
 
@@ -202,29 +204,116 @@ class DataLoader:
 
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})
+
+    measurement_col_filename = os.path.join(self.task_path, 'measurement_cols.npy')
+    if self.is_train:
+      # 컬럼 이름 저장
+      np.save(measurement_col_filename, np.array(measurement_df.columns))
+    else:
+      # 컬럼 로드
+      measurement_cols = np.load(measurement_col_filename, allow_pickle=True)
+      new_measurement_list = []
+      for col in measurement_cols:
+        if col in measurement_df.columns:
+          new_measurement_list.append(measurement_df[col])
+        else:
+          new_measurement_list.append(pd.Series([0] * measurement_df.shape[0]))
+
+      measurement_df = pd.concat(new_measurement_list, axis=1)
+      measurement_df.columns = measurement_cols
     print("data_loader groupby_hour_measurement time:", time.time() - start_time)
     return measurement_df
+
+  def make_person_sequence(self):
+    start_time = time.time()
+    # 환자별로 데이터의 시작시간과 종료시간을 구한다.
+    timerange_df = self.cohort_df.groupby('SUBJECT_ID').agg({'COHORT_START_DATE': 'min', 'COHORT_END_DATE': 'max'})
+    timerange_df['START_DATE'] = timerange_df.COHORT_START_DATE.dt.date
+    timerange_df['START_HOURGRP'] = timerange_df.COHORT_START_DATE.dt.hour // self.group_hour
+    timerange_df['END_DATE'] = timerange_df.COHORT_END_DATE.dt.date
+    timerange_df['END_HOURGRP'] = timerange_df.COHORT_END_DATE.dt.hour // self.group_hour
+    timerange_df = timerange_df.drop(['COHORT_START_DATE', 'COHORT_END_DATE'], axis=1)
+
+    condition_ary = self.condition_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=True).values
+    measurement_ary = self.measurement_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=True).values
+    timerange_ary = timerange_df.sort_values('SUBJECT_ID', ascending=True).reset_index().values
+
+    condition_cols = self.condition_df.columns[3:]
+    measurement_cols = self.measurement_df.columns[3:]
+
+    # 빈 Time Range 없게 시간대 정보를 채움
+    max_hourgrp = (24 // self.group_hour) - 1
+    
+    key_list = []
+    for person_id, start_date, start_hourgrp, end_date, end_hourgrp in timerange_ary:
+      cur_date = start_date
+      cur_hourgrp = start_hourgrp
+      
+      while True:
+        key_list.append((person_id, cur_date, cur_hourgrp))
+
+        cur_hourgrp += 1                  # 1 그룹시간만큼 탐색
+        if cur_hourgrp > max_hourgrp:     # 다음 날짜로 넘어감
+          cur_date = cur_date + timedelta(days=1)
+          cur_hourgrp = 0
+
+        if cur_date > end_date or \
+           (cur_date == end_date and cur_hourgrp >= end_hourgrp):
+           # 끝까지 탐색함
+           break
+
+    # 시간대 정보에 따라 데이터를 채워 넣는다
+    condition_idx = measurement_idx = 0
+
+    data_list = []
+    for person_id, date, hourgrp in key_list:
+      data = [person_id, date, hourgrp]
+      
+      # Measurement 탐색
+      while True:
+        measurement_row = measurement_ary[measurement_idx]
+        measurement_person_id = measurement_row[0]
+        measurement_date = measurement_row[1]
+        measurement_hourgrp = measurement_row[2]
+        measurement_data = measurement_row[3:]
+
+        state = 0       # 0: 다음 데이터 탐색 1: 맞는 데이터 찾음 2: 맞는 데이터 없음
+        if measurement_person_id > person_id:       # 다음 환자로 넘어감
+          state = 2
+        elif measurement_person_id == person_id:
+          if measurement_date > date:               # 다음 날짜로 넘어감
+            state = 2
+          elif measurement_date == date:
+            if measurement_hourgrp > hourgrp:       # 다음 그룹시간으로 넘어감
+              state = 2
+            elif measurement_hourgrp == hourgrp:    # 맞는 데이터
+              state = 1
+
+        if state == 0:                  # 계속 탐색
+          measurement_idx += 1
+        elif state == 1:                # 데이터 찾음
+          data.extend(measurement_data)
+          measurement_idx += 1
+          break
+        elif state == 2:                # 맞는 데이터가 없음
+          data.extend([0] * len(measurement_data))
+          break
+
+      # Condition 탐색
+      # TODO
+
+      data_list.append(data)
+    self.feature_df = pd.DataFrame(data_list, columns=['PERSON_ID', 'DATE', 'HOURGRP'] + list(measurement_cols))
+    print(self.feature_df)
+    print("data_loader make_person_sequence time:", time.time() - start_time)
 
   def make_data(self):
     start_time = time.time()
     # 빠른 서치를 위하여 데이터 정렬
     # 가장 마지막 시점이 먼저 오도록 반대로 정렬
     cohort_df = self.cohort_df.sort_values(['SUBJECT_ID', 'COHORT_END_DATE'], ascending=[True, False])
-    # measurement_ary = self.measurement_df.sort_values(['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP'],
-    #                                                   ascending=[True, False, False]).values
-
-    # timestamp가 가장 세밀한 검진에 진단을 붙임
-    feature_df = pd.merge(self.measurement_df, self.condition_df, how='left',
-                          on=['PERSON_ID', 'DATE', 'HOURGRP'])
-
-    # 새로운 진단이 나올때까지 직전의 진단을 유지
-    feature_df[self.condition_cols] = feature_df[self.condition_cols].fillna(method='ffill')
-    feature_df = feature_df.fillna(0)
-
-    feature_df = feature_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'],
-                                        ascending=[True, False, False])
-    feature_ary = feature_df.values
-
+    feature_ary = self.feature_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=[True, False, False]).values
+    
     cols = ['SUBJECT_ID', 'COHORT_END_DATE']
     if self.is_train:
       cols.append('LABEL')
@@ -238,7 +327,7 @@ class DataLoader:
       subject_id = row[0]
       cohort_end_date = row[1]
 
-      # key에 맞는 measurement를 찾는다
+      # key에 맞는 data feature 찾는다
       while True:
         feature_row = feature_ary[feature_idx]
 
@@ -264,10 +353,12 @@ class DataLoader:
               each_x_list.append(timestep_data)
             else:
               break
-          x_list.append(np.array(each_x_list))
+          # 가장 나중 데이터부터 each_x_list에 넣었으니 데이터에 넣을땐 반대로
+          x_list.append(np.array(each_x_list)[::-1])
           break
         elif person_id > subject_id:
           # 데이터를 못찾음. 다음 환자로 넘어가버렸다
+          print("Person's data not found", subject_id)
           feature_data = feature_row[3:]
           x_list.append(np.array([[0] * len(feature_data)]))
           break
@@ -285,7 +376,6 @@ class DataLoader:
     self.x = np.array(x_list)
     self.y = np.array(y_list) if self.is_train else None
     self.key = pd.DataFrame(key_list, columns=['SUBJECT_ID', 'COHORT_END_DATE'])
-
     print("data_loader make_data time:", time.time() - start_time)
 
   def split_data(self):

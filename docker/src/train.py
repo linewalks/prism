@@ -47,7 +47,7 @@ callbacks = [
 
 model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
-            epochs=20, batch_size=32,
+            epochs=15, batch_size=32,
             callbacks=callbacks)
 
 # Valid F1 score가 가장 잘나오는 베스트 

@@ -36,7 +36,7 @@ callbacks = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
                     monitor='val_loss',
                     checkpoint_mode='min',
-                    save_best_only=True,
+                    save_best_only=False,
                     save_weights_only=False,
                     verbose=True
     ),
@@ -47,7 +47,7 @@ callbacks = [
 
 model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
-            epochs=15, batch_size=32,
+            epochs=10, batch_size=32,
             callbacks=callbacks)
 
 # Valid F1 score가 가장 잘나오는 베스트 

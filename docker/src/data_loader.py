@@ -167,6 +167,23 @@ class DataLoader:
                                .DUMMY.count().unstack().reset_index().fillna(0)
 
     condition_df = condition_df.rename(columns={'CONDITION_DATE': 'DATE'})
+
+    condition_col_filename = os.path.join(self.task_path, 'condition_cols.npy')
+    if self.is_train:
+      # 컬럼 이름 저장
+      np.save(condition_col_filename, np.array(condition_df.columns))
+    else:
+      # 컬럼 로드
+      condition_cols = np.load(condition_col_filename, allow_pickle=True)
+      new_condition_list = []
+      for col in condition_cols:
+        if col in condition_df.columns:
+          new_condition_list.append(condition_df[col])
+        else:
+          new_condition_list.append(pd.Series([0] * condition_df.shape[0]))
+
+      condition_df = pd.concat(new_condition_list, axis=1)
+      condition_df.columns = condition_cols
     print("data_loader groupby_hour_condition time:", time.time() - start_time)
     return condition_df
 
@@ -264,6 +281,8 @@ class DataLoader:
 
     # 시간대 정보에 따라 데이터를 채워 넣는다
     condition_idx = measurement_idx = 0
+    prev_person_id = None
+    prev_conditions = None
 
     data_list = []
     for person_id, date, hourgrp in key_list:
@@ -271,6 +290,10 @@ class DataLoader:
       
       # Measurement 탐색
       while True:
+        if measurement_idx >= len(measurement_ary):
+          data.extend([0] * len(measurement_data))
+          break
+          
         measurement_row = measurement_ary[measurement_idx]
         measurement_person_id = measurement_row[0]
         measurement_date = measurement_row[1]
@@ -300,10 +323,50 @@ class DataLoader:
           break
 
       # Condition 탐색
-      # TODO
+      # 이전과 다른 환자임. condition정보 reset
+      if prev_person_id != person_id:
+        prev_conditions = np.array([0] * len(condition_ary[0][3:]))
+      
+      while True:
+        if condition_idx >= len(condition_ary):
+          data.extend(prev_conditions)
+          break
+
+        condition_row = condition_ary[condition_idx]
+        condition_person_id = condition_row[0]
+        condition_date = condition_row[1]
+        condition_hourgrp = condition_row[2]
+        condition_data = condition_row[3:]
+
+        state = 0       # 0: 다음 데이터 탐색 1: 맞는 데이터 찾음 2: 맞는 데이터 없음
+        if condition_person_id > person_id:       # 다음 환자로 넘어감
+          state = 2
+        elif condition_person_id == person_id:
+          if condition_date > date:               # 다음 날짜로 넘어감
+            state = 2
+          elif condition_date == date:
+            if condition_hourgrp > hourgrp:       # 다음 그룹시간으로 넘어감
+              state = 2
+            elif condition_hourgrp == hourgrp:    # 맞는 데이터
+              state = 1
+
+        if state == 0:                  # 계속 탐색
+          condition_idx += 1
+        elif state == 1:                # 데이터 찾음
+          # 이전 Condition 정보와 나중 Condition 정보를 합친다
+          prev_conditions = np.array(prev_conditions) + np.array(condition_data)
+          data.extend(prev_conditions)
+          condition_idx += 1
+          break
+        elif state == 2:                # 맞는 데이터가 없음
+          data.extend(prev_conditions)
+          break
 
       data_list.append(data)
-    self.feature_df = pd.DataFrame(data_list, columns=['PERSON_ID', 'DATE', 'HOURGRP'] + list(measurement_cols))
+      prev_person_id = person_id
+
+    self.feature_df = pd.DataFrame(data_list, 
+                                   columns=['PERSON_ID', 'DATE', 'HOURGRP'] + list(measurement_cols) + list(condition_cols))
     print(self.feature_df)
     print("data_loader make_person_sequence time:", time.time() - start_time)
 

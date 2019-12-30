@@ -42,7 +42,7 @@ class DataLoader:
                is_train=True,
                group_hour=1, timestep_per_data=128,
                measurement_normalize=True,
-               condition_min_limit=0, condition_group=True,
+               condition_min_limit=0, condition_group=False,
                valid_size=0.2, data_split_random_seed=1235, pytest=False):
     self.data_path = data_path
     self.common_path = common_path
@@ -303,7 +303,8 @@ class DataLoader:
     prev_person_id = None
     prev_conditions = None
 
-    data_list = []
+    data_cols = ['PERSON_ID', 'DATE', 'HOURGRP'] + list(measurement_cols) + list(condition_cols)
+    data_list = []]
     for person_id, date, hourgrp in key_list:
       data = [person_id, date, hourgrp]
       
@@ -385,7 +386,7 @@ class DataLoader:
       prev_person_id = person_id
 
     self.feature_df = pd.DataFrame(data_list, 
-                                   columns=['PERSON_ID', 'DATE', 'HOURGRP'] + list(measurement_cols) + list(condition_cols))
+                                   columns=data_cols)
     print(self.feature_df)
     print("data_loader make_person_sequence time:", time.time() - start_time)
 

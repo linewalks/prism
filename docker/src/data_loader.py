@@ -212,7 +212,7 @@ class DataLoader:
 
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
     new_cols = []
-    for col in  measurement_df.columns:
+    for col in measurement_df.columns:
       if col[1] == '':
         new_cols.append(col[0])
       elif col[0] in agg_list:
@@ -441,28 +441,49 @@ class DataLoader:
     self.key = pd.DataFrame(key_list, columns=['SUBJECT_ID', 'COHORT_END_DATE'])
     print("data_loader make_data time:", time.time() - start_time)
 
+  def _stratified_shuffle(self):
+    true_patient = self.key.loc[np.where(self.y == 1)[0], ].SUBJECT_ID.unique()
+    false_patient = self.key.loc[np.where(self.y == 0)[0], ].SUBJECT_ID.unique()
+
+    true_train_patient, true_valid_patient = train_test_split(true_patient,
+                                                              train_size=(1 - self.valid_size),
+                                                              test_size=self.valid_size,
+                                                              random_state=self.data_split_random_seed)
+
+    false_train_patient, false_valid_patient = train_test_split(false_patient,
+                                                                train_size=(1 - self.valid_size),
+                                                                test_size=self.valid_size,
+                                                                random_state=self.data_split_random_seed)
+
+    train_patient = np.concatenate([true_train_patient, false_train_patient])
+    valid_patient = np.concatenate([true_valid_patient, false_valid_patient])
+    np.random.shuffle(train_patient)
+    np.random.shuffle(valid_patient)
+
+    self.train_x = self.x[self.key.SUBJECT_ID.isin(train_patient)]
+    self.train_y = self.y[self.key.SUBJECT_ID.isin(train_patient)]
+
+    self.valid_x = self.x[self.key.SUBJECT_ID.isin(valid_patient)]
+    self.valid_y = self.y[self.key.SUBJECT_ID.isin(valid_patient)]
+
+  def _train_split_data(self):
+    try:
+
+      self._stratified_shuffle()
+    except ValueError:  # is sample data
+      self.train_x = self.x
+      self.train_y = self.y
+
+      self.valid_x = self.x
+      self.valid_y = self.y
+
+    self.train_x = pad_sequences(self.train_x)
+    self.valid_x = pad_sequences(self.valid_x)
+
   def split_data(self):
     start_time = time.time()
     if self.is_train:
-      try:
-        train_patient, valid_patient = train_test_split(self.key.SUBJECT_ID.unique(),
-                                                        test_size=self.valid_size,
-                                                        random_state=self.data_split_random_seed)
-
-        self.train_x = self.x[self.key.SUBJECT_ID.isin(train_patient)]
-        self.train_y = self.y[self.key.SUBJECT_ID.isin(train_patient)]
-
-        self.valid_x = self.x[self.key.SUBJECT_ID.isin(valid_patient)]
-        self.valid_y = self.y[self.key.SUBJECT_ID.isin(valid_patient)]
-      except ValueError:                                      # is sample data
-        self.train_x = self.x
-        self.train_y = self.y
-
-        self.valid_x = self.x
-        self.valid_y = self.y
-
-      self.train_x = pad_sequences(self.train_x)
-      self.valid_x = pad_sequences(self.valid_x)
+      self._train_split_data()
     else:
       self.train_x = pad_sequences(self.x)
 

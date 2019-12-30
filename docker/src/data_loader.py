@@ -42,6 +42,7 @@ class DataLoader:
                is_train=True,
                group_hour=1, timestep_per_data=128,
                measurement_normalize=True,
+               condition_min_limit=0, condition_group=True,
                valid_size=0.2, data_split_random_seed=1235, pytest=False):
     self.data_path = data_path
     self.common_path = common_path
@@ -52,6 +53,9 @@ class DataLoader:
     self.timestep_per_data = timestep_per_data
 
     self.measurement_normalize = measurement_normalize
+
+    self.condition_min_limit = condition_min_limit
+    self.condition_group = condition_group
 
     self.valid_size = valid_size
     self.data_split_random_seed = data_split_random_seed
@@ -67,18 +71,25 @@ class DataLoader:
     self.person_df = self.extract_person()
     self.condition_df = self.extract_condition()
     self.measurement_df = self.extract_measurement()
-    self.condition_cols = None
     # 데이터를 시간대별로 Group
     self.groupby_hour()
 
     # 환자별 시간 시퀀스 데이터를 만듦
     self.make_person_sequence()
 
+    # 메모리 확보를 위하여 삭제
+    del self.person_df
+    del self.condition_df
+    del self.measurement_df
+
     # cohort_df에 맞추어 모델에 들어갈 데이터를 만듦
     self.make_data()
 
     # 환자 기준으로 train/valid split
     self.split_data()
+
+    del self.x
+    del self.y
 
   def extract_outcome_cohort(self):
     start_time = time.time()
@@ -105,6 +116,9 @@ class DataLoader:
     # Null 이거나 값이 빈 것을 날림
     condition_df = condition_df[pd.notnull(condition_df.CONDITION_SOURCE_VALUE)]
     condition_df = condition_df[condition_df.CONDITION_SOURCE_VALUE.str.len() > 0]
+
+    if self.condition_group:
+      condition_df.CONDITION_SOURCE_VALUE = condition_df.CONDITION_SOURCE_VALUE.str.slice(stop=3)
 
     # 컬럼 타입 설정
     condition_df.CONDITION_START_DATETIME = pd.to_datetime(condition_df.CONDITION_START_DATETIME, utc=True)
@@ -155,12 +169,17 @@ class DataLoader:
 
     condition_df['CONDITION_DATE'] = condition_df.CONDITION_START_DATETIME.dt.date
     condition_df['CONDITION_DATE'] = pd.to_datetime(condition_df.CONDITION_DATE, utc=True)
+    
+    if self.is_train and self.condition_min_limit > 0:
+      condition_group = condition_df.groupby('CONDITION_SOURCE_VALUE').PERSON_ID.count()
+      condition_group = condition_group[condition_group > self.condition_min_limit].index
+
+      condition_df = condition_df[condition_df.CONDITION_SOURCE_VALUE.isin(condition_group)]
 
     # 진단은 시간이 없다. 당일의 마지막에 진단 받은걸로 가정한다
     condition_df['HOURGRP'] = 23 // self.group_hour
 
     group_cols = ['PERSON_ID', 'CONDITION_DATE', 'HOURGRP', 'CONDITION_SOURCE_VALUE']
-    self.condition_cols = condition_df.CONDITION_SOURCE_VALUE.unique().tolist()
 
     condition_df['DUMMY'] = condition_df['CONDITION_SOURCE_VALUE']
     condition_df = condition_df.groupby(group_cols) \
@@ -439,6 +458,10 @@ class DataLoader:
     self.x = np.array(x_list)
     self.y = np.array(y_list) if self.is_train else None
     self.key = pd.DataFrame(key_list, columns=['SUBJECT_ID', 'COHORT_END_DATE'])
+    print(self.x.shape)
+    if self.y is not None:
+      print(self.y.shape)
+    print(self.key.shape)
     print("data_loader make_data time:", time.time() - start_time)
 
   def split_data(self):

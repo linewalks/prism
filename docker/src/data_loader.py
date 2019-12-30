@@ -2,8 +2,9 @@ import os
 import time
 import numpy as np
 import pandas as pd
+import pytz
 from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
@@ -111,6 +112,14 @@ class DataLoader:
         person_df[['PERSON_ID', 'BIRTH_DATETIME']],
         pd.get_dummies(person_df.GENDER_SOURCE_VALUE, prefix='gender')
     ], axis=1)
+
+    # 생일 컬럼 타입 설정
+    person_df.BIRTH_DATETIME = pd.to_datetime(person_df.BIRTH_DATETIME, utc=True)
+    # 여성/남성 컬럼 1개로 처리
+    person_df.rename(columns={'gender_M': 'GENDER'}, inplace=True)
+    if 'gender_F' in person_df.columns:
+      del person_df['gender_F']
+
     print("data_loader extract_person time:", time.time() - start_time)
     return person_df
 
@@ -173,7 +182,7 @@ class DataLoader:
 
     condition_df['CONDITION_DATE'] = condition_df.CONDITION_START_DATETIME.dt.date
     condition_df['CONDITION_DATE'] = pd.to_datetime(condition_df.CONDITION_DATE, utc=True)
-    
+
     if self.is_train and self.condition_min_limit > 0:
       condition_group = condition_df.groupby('CONDITION_SOURCE_VALUE').PERSON_ID.count()
       condition_group = condition_group[condition_group > self.condition_min_limit].index
@@ -290,10 +299,12 @@ class DataLoader:
     timerange_df['END_HOURGRP'] = timerange_df.COHORT_END_DATE.dt.hour // self.group_hour
     timerange_df = timerange_df.drop(['COHORT_START_DATE', 'COHORT_END_DATE'], axis=1)
 
+    demographic_ary = self.person_df.sort_values('PERSON_ID', ascending=True).values
     condition_ary = self.condition_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=True).values
     measurement_ary = self.measurement_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=True).values
     timerange_ary = timerange_df.sort_values('SUBJECT_ID', ascending=True).reset_index().values
 
+    demographic_cols = ["AGE_HOUR", "GENDER"]
     condition_cols = self.condition_df.columns[3:]
     measurement_cols = self.measurement_df.columns[3:]
 
@@ -319,13 +330,41 @@ class DataLoader:
           break
 
     # 시간대 정보에 따라 데이터를 채워 넣는다
-    condition_idx = measurement_idx = 0
+    demographic_idx = condition_idx = measurement_idx = 0
     prev_person_id = None
     prev_conditions = None
 
     data_list = []
     for person_id, date, hourgrp in key_list:
       data = [person_id, date, hourgrp]
+
+      # Demographic 추가
+      while True:
+        if demographic_idx >= len(demographic_ary):
+          data.extend([0] * len(demographic_cols))
+          break
+        demographic_row = demographic_ary[demographic_idx]
+        demographic_person_id = demographic_row[0]
+        # 시간 계산을 위해 tz를 동일하게 맞춤.
+        demographic_age = datetime.combine(date, datetime_time(hour=hourgrp, tzinfo=timezone.utc)).astimezone(
+            pytz.utc) - demographic_row[1]
+        demographic_gender = demographic_row[2]
+        demographic_data = [demographic_age.total_seconds() // 3600., demographic_gender]
+
+        state = 0       # 0: 다음 데이터 탐색 1: 맞는 데이터 찾음 2: 맞는 데이터 없음
+        if demographic_person_id > person_id:       # 다음 환자로 넘어감
+          state = 2
+        elif demographic_person_id == person_id:  # 맞는 데이터
+          state = 1
+
+        if state == 0:                  # 계속 탐색
+          demographic_idx += 1
+        elif state == 1:                # 데이터 찾음
+          data.extend(demographic_data)
+          break
+        elif state == 2:                # 맞는 데이터가 없음
+          data.extend([0] * len(demographic_data))
+          break
 
       # Measurement 탐색
       while True:
@@ -405,8 +444,8 @@ class DataLoader:
       prev_person_id = person_id
 
     self.feature_df = pd.DataFrame(data_list,
-                                   columns=['PERSON_ID', 'DATE', 'HOURGRP'] + list(measurement_cols) + list(condition_cols))
-    print(self.feature_df)
+                                   columns=['PERSON_ID', 'DATE', 'HOURGRP'] + list(demographic_cols) + list(measurement_cols) + list(condition_cols))
+    print(self.feature_df.to_csv('test.csv'))
     print("data_loader make_person_sequence time:", time.time() - start_time)
 
   def make_data(self):

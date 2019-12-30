@@ -24,7 +24,7 @@ class Test_DataLoader():
   def test_make_data(self):
     data_loader.make_person_sequence()
     data_loader.make_data()
-    assert data_loader.x[0][0].shape == (72,)
+    assert data_loader.x[0][0].shape == (73,)
     assert data_loader.y.shape[0] == data_loader.x.shape[0]
 
   def test_split_data(self):

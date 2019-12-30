@@ -2,6 +2,7 @@ import os
 import time
 import numpy as np
 import pandas as pd
+from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -35,13 +36,15 @@ MEASUREMENT_SOURCE_VALUE_MAP = {
     "VIT": ["TVin"]
 }
 
+MEASUREMENT_NORMALIZATION = ['mean', 'predefined']
+
 
 class DataLoader:
   def __init__(self, data_path='/data/train', common_path='/data/volume',
                task_path='/data/volume/local_test',
                is_train=True,
                group_hour=1, timestep_per_data=128,
-               measurement_normalize=True,
+               measurement_normalize='mean',
                valid_size=0.2, data_split_random_seed=1235, pytest=False):
     self.data_path = data_path
     self.common_path = common_path
@@ -51,6 +54,7 @@ class DataLoader:
     self.group_hour = group_hour
     self.timestep_per_data = timestep_per_data
 
+    assert measurement_normalize in MEASUREMENT_NORMALIZATION
     self.measurement_normalize = measurement_normalize
 
     self.valid_size = valid_size
@@ -142,7 +146,7 @@ class DataLoader:
     else:
       # inference일 경우 저장된 걸 불러온다
       self.measurement_mean_df = pd.read_pickle(os.path.join(self.common_path, 'measurement_mean.pkl'))
-    
+
     print("data_loader extract_measurement time:", time.time() - start_time)
     return measurement_df
 
@@ -164,7 +168,7 @@ class DataLoader:
 
     condition_df['DUMMY'] = condition_df['CONDITION_SOURCE_VALUE']
     condition_df = condition_df.groupby(group_cols) \
-                               .DUMMY.count().unstack().reset_index().fillna(0)
+        .DUMMY.count().unstack().reset_index().fillna(0)
 
     condition_df = condition_df.rename(columns={'CONDITION_DATE': 'DATE'})
 
@@ -187,6 +191,13 @@ class DataLoader:
     print("data_loader groupby_hour_condition time:", time.time() - start_time)
     return condition_df
 
+  def _clip_measurement(self, measurement_source_value, value_as_number):
+    if value_as_number > MEASUREMENT_SOURCE_VALUE_STATS[measurement_source_value]['95%']:
+      value_as_number = MEASUREMENT_SOURCE_VALUE_STATS[measurement_source_value]['95%']
+    elif value_as_number < MEASUREMENT_SOURCE_VALUE_STATS[measurement_source_value]['5%']:
+      value_as_number = MEASUREMENT_SOURCE_VALUE_STATS[measurement_source_value]['5%']
+    return value_as_number
+
   def groupby_hour_measurement(self, measurement_df):
     start_time = time.time()
     # timestamp로 join 하기 위하여 시간 포맷을 utc로 통일
@@ -197,16 +208,25 @@ class DataLoader:
     measurement_df['MEASUREMENT_HOURGRP'] = measurement_df.MEASUREMENT_HOUR // self.group_hour
 
     # 평균값 이용하여 Normalize
-    if self.measurement_normalize: 
-      measurement_df = pd.merge(measurement_df, 
-                                self.measurement_mean_df.reset_index().rename(columns={'VALUE_AS_NUMBER': 'MEAN_VALUE'}),
+    if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
+      measurement_df = pd.merge(measurement_df,
+                                self.measurement_mean_df.reset_index().rename(
+                                    columns={'VALUE_AS_NUMBER': 'MEAN_VALUE'}),
                                 on='MEASUREMENT_SOURCE_VALUE', how='left')
       measurement_df.VALUE_AS_NUMBER = measurement_df.VALUE_AS_NUMBER / measurement_df.MEAN_VALUE
-    
+    # 생체신호 범위를 이용하여 Normalize
+    elif self.measurement_normalize == MEASUREMENT_NORMALIZATION[1]:
+      measurement_df.VALUE_AS_NUMBER = measurement_df.apply(lambda row:
+                                                            self._clip_measurement(
+                                                                row['MEASUREMENT_SOURCE_VALUE'],
+                                                                row['VALUE_AS_NUMBER']),
+                                                            axis=1)
+
+      # TODO
     group_cols = ['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP', 'MEASUREMENT_SOURCE_VALUE']
     agg_list = ['count', 'min', 'max', 'mean', 'std', 'var']
     measurement_df = measurement_df.groupby(group_cols) \
-                                   .VALUE_AS_NUMBER.agg(agg_list)
+        .VALUE_AS_NUMBER.agg(agg_list)
 
     measurement_df = measurement_df.unstack().reset_index().fillna(0)
 
@@ -260,12 +280,12 @@ class DataLoader:
 
     # 빈 Time Range 없게 시간대 정보를 채움
     max_hourgrp = (24 // self.group_hour) - 1
-    
+
     key_list = []
     for person_id, start_date, start_hourgrp, end_date, end_hourgrp in timerange_ary:
       cur_date = start_date
       cur_hourgrp = start_hourgrp
-      
+
       while True:
         key_list.append((person_id, cur_date, cur_hourgrp))
 
@@ -276,8 +296,8 @@ class DataLoader:
 
         if cur_date > end_date or \
            (cur_date == end_date and cur_hourgrp >= end_hourgrp):
-           # 끝까지 탐색함
-           break
+          # 끝까지 탐색함
+          break
 
     # 시간대 정보에 따라 데이터를 채워 넣는다
     condition_idx = measurement_idx = 0
@@ -287,13 +307,13 @@ class DataLoader:
     data_list = []
     for person_id, date, hourgrp in key_list:
       data = [person_id, date, hourgrp]
-      
+
       # Measurement 탐색
       while True:
         if measurement_idx >= len(measurement_ary):
-          data.extend([0] * len(measurement_data))
+          data.extend([0] * len(measurement_cols))
           break
-          
+
         measurement_row = measurement_ary[measurement_idx]
         measurement_person_id = measurement_row[0]
         measurement_date = measurement_row[1]
@@ -325,8 +345,8 @@ class DataLoader:
       # Condition 탐색
       # 이전과 다른 환자임. condition정보 reset
       if prev_person_id != person_id:
-        prev_conditions = np.array([0] * len(condition_ary[0][3:]))
-      
+        prev_conditions = np.array([0] * len(condition_cols))
+
       while True:
         if condition_idx >= len(condition_ary):
           data.extend(prev_conditions)
@@ -365,7 +385,7 @@ class DataLoader:
       data_list.append(data)
       prev_person_id = person_id
 
-    self.feature_df = pd.DataFrame(data_list, 
+    self.feature_df = pd.DataFrame(data_list,
                                    columns=['PERSON_ID', 'DATE', 'HOURGRP'] + list(measurement_cols) + list(condition_cols))
     print(self.feature_df)
     print("data_loader make_person_sequence time:", time.time() - start_time)
@@ -376,7 +396,7 @@ class DataLoader:
     # 가장 마지막 시점이 먼저 오도록 반대로 정렬
     cohort_df = self.cohort_df.sort_values(['SUBJECT_ID', 'COHORT_END_DATE'], ascending=[True, False])
     feature_ary = self.feature_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=[True, False, False]).values
-    
+
     cols = ['SUBJECT_ID', 'COHORT_END_DATE']
     if self.is_train:
       cols.append('LABEL')

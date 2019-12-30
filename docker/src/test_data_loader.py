@@ -4,7 +4,10 @@ import pandas as pd
 from data_loader import DataLoader
 
 data_path = '../data/'
-data_loader = DataLoader(data_path=os.path.join(data_path, 'train'), pytest=True)
+data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
+                         common_path=os.path.join(data_path, 'volume'),
+                         task_path=os.path.join(data_path, 'volume', 'local_test'),
+                         pytest=True)
 
 
 class Test_DataLoader():
@@ -19,6 +22,7 @@ class Test_DataLoader():
     data_loader.groupby_hour()
 
   def test_make_data(self):
+    data_loader.make_person_sequence()
     data_loader.make_data()
     assert data_loader.x[0][0].shape == (72,)
     assert data_loader.y.shape[0] == data_loader.x.shape[0]
@@ -43,3 +47,17 @@ class Test_DataLoader():
     data_loader._stratified_shuffle()
     assert data_loader.train_y.sum() == 1
     assert data_loader.valid_y.sum() == 1
+
+  def test_measurement_clip(self):
+    hr = [0, 130, 150, 183, 190]
+    rr = [0, 27, 50, 70, 80]
+    rows = [['HR', v] for v in hr] + [['RR', v] for v in rr]
+
+    df = pd.DataFrame(rows, columns=['MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER'])
+    print(df)
+    df.VALUE_AS_NUMBER = df.apply(lambda row:
+                                  data_loader._clip_measurement(
+                                      row['MEASUREMENT_SOURCE_VALUE'],
+                                      row['VALUE_AS_NUMBER']),
+                                  axis=1)
+

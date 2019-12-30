@@ -71,6 +71,7 @@ class DataLoader:
     self.person_df = self.extract_person()
     self.condition_df = self.extract_condition()
     self.measurement_df = self.extract_measurement()
+
     # 데이터를 시간대별로 Group
     self.groupby_hour()
 
@@ -125,6 +126,7 @@ class DataLoader:
 
     # 필요 컬럼만 사용
     condition_df = condition_df[['PERSON_ID', 'CONDITION_SOURCE_VALUE', 'CONDITION_START_DATETIME']]
+
     print("data_loader extract_condition time:", time.time() - start_time)
     return condition_df
 
@@ -303,15 +305,18 @@ class DataLoader:
     prev_person_id = None
     prev_conditions = None
 
-    data_cols = ['PERSON_ID', 'DATE', 'HOURGRP'] + list(measurement_cols) + list(condition_cols)
-    data_list = []]
-    for person_id, date, hourgrp in key_list:
-      data = [person_id, date, hourgrp]
+    data_cols = list(measurement_cols) + list(condition_cols)
+    data_list = np.zeros((len(key_list), len(data_cols)), dtype=np.float32)
+    for idx, row in enumerate(key_list):
+      person_id, date, hourgrp = row
+
+      col_start_idx = col_end_idx =0
       
       # Measurement 탐색
+      col_start_idx = col_end_idx
+      col_end_idx += len(measurement_cols)
       while True:
         if measurement_idx >= len(measurement_ary):
-          data.extend([0] * len(measurement_data))
           break
           
         measurement_row = measurement_ary[measurement_idx]
@@ -335,21 +340,21 @@ class DataLoader:
         if state == 0:                  # 계속 탐색
           measurement_idx += 1
         elif state == 1:                # 데이터 찾음
-          data.extend(measurement_data)
+          data_list[idx, col_start_idx:col_end_idx] = measurement_data
           measurement_idx += 1
           break
         elif state == 2:                # 맞는 데이터가 없음
-          data.extend([0] * len(measurement_data))
           break
 
       # Condition 탐색
+      col_start_idx = col_end_idx
+      col_end_idx += len(condition_cols)
       # 이전과 다른 환자임. condition정보 reset
       if prev_person_id != person_id:
         prev_conditions = np.array([0] * len(condition_ary[0][3:]))
       
       while True:
         if condition_idx >= len(condition_ary):
-          data.extend(prev_conditions)
           break
 
         condition_row = condition_ary[condition_idx]
@@ -375,19 +380,16 @@ class DataLoader:
         elif state == 1:                # 데이터 찾음
           # 이전 Condition 정보와 나중 Condition 정보를 합친다
           prev_conditions = np.array(prev_conditions) + np.array(condition_data)
-          data.extend(prev_conditions)
+          data_list[idx, col_start_idx:col_end_idx] = prev_conditions
           condition_idx += 1
           break
         elif state == 2:                # 맞는 데이터가 없음
-          data.extend(prev_conditions)
           break
 
-      data_list.append(data)
       prev_person_id = person_id
 
-    self.feature_df = pd.DataFrame(data_list, 
-                                   columns=data_cols)
-    print(self.feature_df)
+    self.feature_ary = data_list
+    self.feature_key_df = pd.DataFrame(key_list, columns=['PERSON_ID', 'DATE', 'HOURGRP'])
     print("data_loader make_person_sequence time:", time.time() - start_time)
 
   def make_data(self):
@@ -395,7 +397,9 @@ class DataLoader:
     # 빠른 서치를 위하여 데이터 정렬
     # 가장 마지막 시점이 먼저 오도록 반대로 정렬
     cohort_df = self.cohort_df.sort_values(['SUBJECT_ID', 'COHORT_END_DATE'], ascending=[True, False])
-    feature_ary = self.feature_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=[True, False, False]).values
+    feature_key_df = self.feature_key_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=[True, False, False])
+    feature_ary = self.feature_ary[feature_key_df.index]
+    feature_key_ary = feature_key_df.values
     
     cols = ['SUBJECT_ID', 'COHORT_END_DATE']
     if self.is_train:
@@ -412,11 +416,8 @@ class DataLoader:
 
       # key에 맞는 data feature 찾는다
       while True:
+        person_id, feature_date, feature_hourgrp = feature_key_ary[feature_idx]
         feature_row = feature_ary[feature_idx]
-
-        person_id = feature_row[0]
-        feature_date = feature_row[1]
-        feature_hourgrp = feature_row[2]
 
         feature_datetime = datetime(feature_date.year,
                                     feature_date.month,
@@ -429,10 +430,10 @@ class DataLoader:
           for timestep in range(self.timestep_per_data):
             if feature_idx + timestep >= len(feature_ary):
               break
+            timestep_person_id = feature_key_ary[feature_idx + timestep][0]
             timestep_row = feature_ary[feature_idx + timestep]
-            timestep_person_id = timestep_row[0]
             if timestep_person_id == subject_id:
-              timestep_data = timestep_row[3:]
+              timestep_data = timestep_row
               each_x_list.append(timestep_data)
             else:
               break
@@ -442,7 +443,7 @@ class DataLoader:
         elif person_id > subject_id:
           # 데이터를 못찾음. 다음 환자로 넘어가버렸다
           print("Person's data not found", subject_id)
-          feature_data = feature_row[3:]
+          feature_data = feature_row
           x_list.append(np.array([[0] * len(feature_data)]))
           break
         else:
@@ -459,10 +460,10 @@ class DataLoader:
     self.x = np.array(x_list)
     self.y = np.array(y_list) if self.is_train else None
     self.key = pd.DataFrame(key_list, columns=['SUBJECT_ID', 'COHORT_END_DATE'])
-    print(self.x.shape)
+    print("X", self.x.shape)
     if self.y is not None:
-      print(self.y.shape)
-    print(self.key.shape)
+      print("Y", self.y.shape)
+    print("Key", self.key.shape)
     print("data_loader make_data time:", time.time() - start_time)
 
   def split_data(self):

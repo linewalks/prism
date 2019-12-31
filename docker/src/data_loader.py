@@ -126,7 +126,8 @@ class DataLoader:
 
   def extract_condition(self):
     start_time = time.time()
-    condition_df = pd.read_csv(os.path.join(self.data_path, 'CONDITION_OCCURRENCE_NICU.csv'), encoding='windows-1252')
+    condition_df = pd.read_csv(os.path.join(self.data_path, 'CONDITION_OCCURRENCE_NICU.csv'), encoding='windows-1252',
+                               usecols=['PERSON_ID', 'CONDITION_SOURCE_VALUE', 'CONDITION_START_DATETIME'])
     # Null 이거나 값이 빈 것을 날림
     condition_df = condition_df[pd.notnull(condition_df.CONDITION_SOURCE_VALUE)]
     condition_df = condition_df[condition_df.CONDITION_SOURCE_VALUE.str.len() > 0]
@@ -137,32 +138,29 @@ class DataLoader:
     # 컬럼 타입 설정
     condition_df.CONDITION_START_DATETIME = pd.to_datetime(condition_df.CONDITION_START_DATETIME, utc=True)
 
-    # 필요 컬럼만 사용
-    condition_df = condition_df[['PERSON_ID', 'CONDITION_SOURCE_VALUE', 'CONDITION_START_DATETIME']]
-
     print("data_loader extract_condition time:", time.time() - start_time)
     return condition_df
 
   def extract_measurement(self):
     start_time = time.time()
-    measurement_df = pd.read_csv(os.path.join(self.data_path, 'MEASUREMENT_NICU.csv'), encoding='windows-1252')
+    measurement_df = pd.read_csv(os.path.join(self.data_path, 'MEASUREMENT_NICU.csv'), 
+                                 encoding='windows-1252',
+                                 usecols=['PERSON_ID', 'MEASUREMENT_DATETIME',
+                                          'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']
+                                 )
+    if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
+      # source_value 맵핑
+      source_value_invert_map = {}
+      for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
+        for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
+          source_value_invert_map[table_value] = new_value
+      measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
 
-    # source_value 맵핑
-    source_value_invert_map = {}
-    for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
-      for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
-        source_value_invert_map[table_value] = new_value
-    measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
-
-    # 맵핑이된 정보만 남긴다
-    measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
+      # 맵핑이된 정보만 남긴다
+      measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
 
     # 컬럼 타입 설정
     measurement_df.MEASUREMENT_DATETIME = pd.to_datetime(measurement_df.MEASUREMENT_DATETIME, utc=True)
-
-    # 필요 컬럼만 사용
-    measurement_df = measurement_df[['PERSON_ID', 'MEASUREMENT_DATETIME',
-                                     'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']]
 
     # source_value별 평균값 추출
     if self.is_train:

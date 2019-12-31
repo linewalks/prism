@@ -14,7 +14,12 @@ if task_id is None:
 
 task_path = os.path.join(data_path, 'volume', task_id)
 
-data_loader = DataLoader(data_path=os.path.join(data_path, 'test'), is_train=False)
+print("Inference Start")
+
+data_loader = DataLoader(data_path=os.path.join(data_path, 'test'),
+                         common_path=os.path.join(data_path, 'volume'),
+                         task_path=task_path,
+                         is_train=False)
 model = SimpleRNNModel(data_loader)
 
 # 모델 로드

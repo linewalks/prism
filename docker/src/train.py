@@ -25,14 +25,18 @@ if not os.path.exists(log_path):
 if not os.path.exists(task_log_path):
   os.mkdir(task_log_path)
 
-data_loader = DataLoader(data_path=os.path.join(data_path, 'train'))
+print("Train Start")
+
+data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
+                         common_path=os.path.join(data_path, 'volume'),
+                         task_path=task_path)
 model = SimpleRNNModel(data_loader)
 
 callbacks = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
                     monitor='val_loss',
                     checkpoint_mode='min',
-                    save_best_only=True,
+                    save_best_only=False,
                     save_weights_only=False,
                     verbose=True
     ),
@@ -43,7 +47,7 @@ callbacks = [
 
 model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
-            epochs=20, batch_size=32,
+            epochs=10, batch_size=32,
             callbacks=callbacks)
 
 # Valid F1 score가 가장 잘나오는 베스트 
@@ -63,3 +67,5 @@ print("Valid AUROC", roc_auc_score(valid_y, y_pred))
 
 np.save(os.path.join(task_path, 'f1.npy'), f1_list)
 np.save(os.path.join(task_path, 'thr.npy'), thr_list)
+
+print("Train Done")

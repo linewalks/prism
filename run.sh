@@ -7,7 +7,7 @@ function abs_path {
 dir=$(dirname "$0")
 data_dir=$(abs_path $dir/data)
 
-docker run -e ID=prism-tensorflow-1140-gpu-py3 \
+docker run -e ID=local_test \
   -v $data_dir:/data \
   -it --rm prism-tensorflow-1.14.0-gpu-py3 \
   sh -c './train.sh; ./inference.sh'

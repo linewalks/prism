@@ -147,15 +147,16 @@ class DataLoader:
     start_time = time.time()
     measurement_df = pd.read_csv(os.path.join(self.data_path, 'MEASUREMENT_NICU.csv'), encoding='windows-1252')
 
-    # source_value 맵핑
-    source_value_invert_map = {}
-    for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
-      for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
-        source_value_invert_map[table_value] = new_value
-    measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
+    if self.measurement_normalize == 'mean':
+      # source_value 맵핑
+      source_value_invert_map = {}
+      for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
+        for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
+          source_value_invert_map[table_value] = new_value
+      measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
 
-    # 맵핑이된 정보만 남긴다
-    measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
+      # 맵핑이된 정보만 남긴다
+      measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
 
     # 컬럼 타입 설정
     measurement_df.MEASUREMENT_DATETIME = pd.to_datetime(measurement_df.MEASUREMENT_DATETIME, utc=True)
@@ -255,18 +256,22 @@ class DataLoader:
       # TODO
     group_cols = ['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP', 'MEASUREMENT_SOURCE_VALUE']
     agg_list = ['count', 'min', 'max', 'mean', 'std', 'var']
-    measurement_df = measurement_df.groupby(group_cols) \
-        .VALUE_AS_NUMBER.agg(agg_list)
+    measurement_df['VALUE_DIFF'] = measurement_df.groupby(group_cols) \
+        .VALUE_AS_NUMBER.diff()
+    measurement_df = measurement_df.groupby(group_cols)[['VALUE_AS_NUMBER', 'VALUE_DIFF']].agg(agg_list)
 
     measurement_df = measurement_df.unstack().reset_index().fillna(0)
+    # print(measurement_df.columns)
+    # measurement_diff_cols = [(f'diff_{agg}', source_value) for agg, source_value in measurement_df.columns[3:]]
+    # measurement_df[measurement_diff_cols] = measurement_df.groupby(group_cols[:-1])[measurement_df.columns[3:]].diff().fillna(0)
 
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
     new_cols = []
     for col in measurement_df.columns:
-      if col[1] == '':
+      if col[1] == '' and col[2] == '':
         new_cols.append(col[0])
-      elif col[0] in agg_list:
-        new_cols.append((col[1], col[0]))
+      elif col[1] in agg_list:
+        new_cols.append((col[2], col[1], col[0].split('_')[-1]))
     measurement_df.columns = new_cols
 
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
@@ -347,7 +352,7 @@ class DataLoader:
       while True:
         if demographic_idx >= len(demographic_ary):
           break
-        
+
         demographic_row = demographic_ary[demographic_idx]
         demographic_person_id = demographic_row[0]
         # 시간 계산을 위해 tz를 동일하게 맞춤.

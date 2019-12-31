@@ -7,6 +7,7 @@ data_path = '../data/'
 data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
                          common_path=os.path.join(data_path, 'volume'),
                          task_path=os.path.join(data_path, 'volume', 'local_test'),
+                         measurement_normalize='mean',
                          pytest=True)
 
 
@@ -24,7 +25,10 @@ class Test_DataLoader():
   def test_make_data(self):
     data_loader.make_person_sequence()
     data_loader.make_data()
-    assert data_loader.x[0][0].shape == (73,)
+    if data_loader.measurement_normalize == 'mean':
+      assert data_loader.x[0][0].shape == (134,)
+    else:
+      assert data_loader.x[0][0].shape == (98,)
     assert data_loader.y.shape[0] == data_loader.x.shape[0]
 
   def test_split_data(self):
@@ -54,7 +58,6 @@ class Test_DataLoader():
     rows = [['HR', v] for v in hr] + [['RR', v] for v in rr]
 
     df = pd.DataFrame(rows, columns=['MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER'])
-    print(df)
     df.VALUE_AS_NUMBER = df.apply(lambda row:
                                   data_loader._clip_measurement(
                                       row['MEASUREMENT_SOURCE_VALUE'],

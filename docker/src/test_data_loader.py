@@ -26,7 +26,7 @@ class Test_DataLoader():
     data_loader.make_person_sequence()
     data_loader.make_data()
     if data_loader.measurement_normalize == 'mean':
-      assert data_loader.x[0][0].shape == (134,)
+      assert data_loader.x[0][0].shape == (84,)
     else:
       assert data_loader.x[0][0].shape == (98,)
     assert data_loader.y.shape[0] == data_loader.x.shape[0]

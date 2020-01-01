@@ -9,34 +9,6 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
-MEASUREMENT_SOURCE_VALUE_MAP = {
-    "IDBP": ["ARTd", "ABPd"],
-    "IMBP": ["ABPm"],
-    "ISBP": ["ARTs", "ABPs"],
-    "FDBP": ["AoD"],
-    "FMBP": ["AoS"],
-    "FSBP": ["AoS"],
-    "BT": ["Tskin", "Trect", "Tnaso", "Tesoph", "Temp", "Tcore"],
-    "CVP": ["CVPm"],
-    "ETCO2": ["etCO2"],
-    "PR": ["HR", "Pulse"],
-    "LAP": ["LAPm"],
-    "MINUTE_VOLUME": ["MINVOL", "MV"],
-    "PMEAN": ["MnAwP", "Pmean"],
-    "DBP": ["NBPd", "NBP-D"],
-    "MBP": ["NBPm", "NBP-M"],
-    "SBP": ["NBPs", "NBP-S"],
-    "DPAP": ["PAPd", "Pd"],
-    "MPAP": ["PAPm", "Pm"],
-    "SPAP": ["PAPs", "Ps"],
-    "PPEAK": ["PIP", "Ppeak"],
-    "RR": ["RR, Resp"],
-    "FREQ_MEASURE": ["RRaw"],
-    "SPO2": ["SpO2T", "SpO2-%", "SpO2"],
-    "VTE": ["TV"],
-    "VIT": ["TVin"]
-}
-
 MEASUREMENT_NORMALIZATION = ['mean', 'predefined']
 
 
@@ -257,12 +229,18 @@ class DataLoader:
 
     measurement_diff_df = pd.pivot_table(measurement_df, 
                                          values='VALUE_DIFF', index=group_cols[:-1],
-                                         columns='MEASUREMENT_SOURCE_VALUE', aggfunc=np.mean)
-    measurement_diff_df.columns = pd.MultiIndex.from_tuples([('diff', v) for v in measurement_diff_df.columns]) 
+                                         columns='MEASUREMENT_SOURCE_VALUE', aggfunc=['mean','max','min'])
 
-    measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list).unstack()
-    measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index().fillna(0)
+    measurement_diff_df.columns = [('diff', '{}_{}'.format(v[0],v[1])) for v in measurement_diff_df.columns]
 
+    measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list). \
+    fillna(0).unstack().fillna(method='ffill').fillna(method='bfill')
+
+    measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index()
+
+    if measurement_df.isnull().sum().sum() >0:
+        print("there is Na after interpolation")
+        measurement_df = measurement_df.fillna(0)
     # 사용한 후 삭제
     del measurement_diff_df
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
@@ -394,9 +372,9 @@ class DataLoader:
         if measurement_person_id > person_id:       # 다음 환자로 넘어감
           state = 2
         elif measurement_person_id == person_id:
-          if measurement_date > date:               # 다음 날짜로 넘어감
+          if measurement_date.date() > date:               # 다음 날짜로 넘어감
             state = 2
-          elif measurement_date == date:
+          elif measurement_date.date() == date:
             if measurement_hourgrp > hourgrp:       # 다음 그룹시간으로 넘어감
               state = 2
             elif measurement_hourgrp == hourgrp:    # 맞는 데이터
@@ -432,9 +410,9 @@ class DataLoader:
         if condition_person_id > person_id:       # 다음 환자로 넘어감
           state = 2
         elif condition_person_id == person_id:
-          if condition_date > date:               # 다음 날짜로 넘어감
+          if condition_date.date() > date:               # 다음 날짜로 넘어감
             state = 2
-          elif condition_date == date:
+          elif condition_date.date() == date:
             if condition_hourgrp > hourgrp:       # 다음 그룹시간으로 넘어감
               state = 2
             elif condition_hourgrp == hourgrp:    # 맞는 데이터

@@ -244,7 +244,12 @@ class Test_DataGenerator():
         for dt2, msmt in zip(randomtimes(stime=dt, etime=None, n=n_msmt), generate_measurement(n_msmt)):
           msmt_list.append((i, dt2, msmt[0], msmt[1]))
 
-    print(pd.DataFrame(cond_list, columns=condition_cols))
-    print(pd.DataFrame(msmt_list, columns=measurement_cols))
+    condition_df = pd.DataFrame(cond_list, columns=condition_cols)
+    measurement_df = pd.DataFrame(msmt_list, columns=measurement_cols)
+    COHORT_START_DATE = min(condition_df.CONDITION_START_DATETIME.min(), 
+                            measurement_df.MEASUREMENT_DATETIME.min())
+    COHORT_END_DATE = max(condition_df.CONDITION_START_DATETIME.max(), 
+                          measurement_df.MEASUREMENT_DATETIME.max())
+    print(COHORT_START_DATE, COHORT_END_DATE)
 
-
+    

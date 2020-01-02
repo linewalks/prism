@@ -39,6 +39,16 @@ MEASUREMENT_SOURCE_VALUE_MAP = {
 
 MEASUREMENT_NORMALIZATION = ['mean', 'predefined']
 
+dev_data = os.environ.get('DEV_DATA')
+if dev_data is None:
+  dev_data = ''
+csv_files = {
+  'outcome': f'{dev_data}OUTCOME_COHORT.csv',
+  'measurement': f'{dev_data}MEASUREMENT_NICU.csv',
+  'condition': f'{dev_data}CONDITION_OCCURRENCE_NICU.csv',
+  'person': f'{dev_data}PERSON_NICU.csv'
+}
+
 
 class DataLoader:
   def __init__(self, data_path='/data/train', common_path='/data/volume',
@@ -68,7 +78,8 @@ class DataLoader:
       self.extract_from_file()
 
   def extract_from_file(self):
-
+    
+    print('Load files', csv_files)
     # 각 테이블에서 필요한 정보만 남기고 정리
     # - 불필요 컬럼 제거
     # - outlier, null 값 처리 등
@@ -99,7 +110,7 @@ class DataLoader:
 
   def extract_outcome_cohort(self):
     start_time = time.time()
-    cohort_df = pd.read_csv(os.path.join(self.data_path, 'OUTCOME_COHORT.csv'), encoding='windows-1252')
+    cohort_df = pd.read_csv(os.path.join(self.data_path, csv_files['outcome']), encoding='windows-1252')
 
     cohort_df.COHORT_START_DATE = pd.to_datetime(cohort_df.COHORT_START_DATE)
     cohort_df.COHORT_END_DATE = pd.to_datetime(cohort_df.COHORT_END_DATE)
@@ -108,7 +119,7 @@ class DataLoader:
 
   def extract_person(self):
     start_time = time.time()
-    person_df = pd.read_csv(os.path.join(self.data_path, 'PERSON_NICU.csv'), encoding='windows-1252')
+    person_df = pd.read_csv(os.path.join(self.data_path, csv_files['person']), encoding='windows-1252')
     person_df = pd.concat([
         person_df[['PERSON_ID', 'BIRTH_DATETIME']],
         pd.get_dummies(person_df.GENDER_SOURCE_VALUE, prefix='gender')
@@ -126,7 +137,7 @@ class DataLoader:
 
   def extract_condition(self):
     start_time = time.time()
-    condition_df = pd.read_csv(os.path.join(self.data_path, 'CONDITION_OCCURRENCE_NICU.csv'), encoding='windows-1252',
+    condition_df = pd.read_csv(os.path.join(self.data_path, csv_files['condition']), encoding='windows-1252',
                                usecols=['PERSON_ID', 'CONDITION_SOURCE_VALUE', 'CONDITION_START_DATETIME'])
     # Null 이거나 값이 빈 것을 날림
     condition_df = condition_df[pd.notnull(condition_df.CONDITION_SOURCE_VALUE)]
@@ -143,7 +154,7 @@ class DataLoader:
 
   def extract_measurement(self):
     start_time = time.time()
-    measurement_df = pd.read_csv(os.path.join(self.data_path, 'MEASUREMENT_NICU.csv'), 
+    measurement_df = pd.read_csv(os.path.join(self.data_path, csv_files['measurement']), 
                                  encoding='windows-1252',
                                  usecols=['PERSON_ID', 'MEASUREMENT_DATETIME',
                                           'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']

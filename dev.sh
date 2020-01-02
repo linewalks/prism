@@ -8,7 +8,7 @@ dir=$(dirname "$0")
 data_dir=$(abs_path $dir/data)
 src_dir=$(abs_path $dir/docker/src)
 
-docker run -e ID=local_test \
+docker run -e ID=local_test -e DEV_DATA=dev \
   --name prism-dev \
   -v $data_dir:/data \
   -v $src_dir:/src_dev \

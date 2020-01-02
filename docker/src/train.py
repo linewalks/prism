@@ -94,15 +94,19 @@ traingen = DataGenerator(data_loader.get_train_data,fraction = 0.2)
 valid_gen = DataGenerator(data_loader.get_valid_data,fraction = 0.2)
 
 sample_x,sample_y = traingen.__getitem__(1)
+print("sample_x shape", sample_x.shape)
+
 
 model = SimpleRNNModel(shape=sample_x.shape[2])
-
-model.train(traingen, valid_gen, epochs=200, valid_steps = 10, 
+del sample_x
+model.train(traingen, valid_gen, epochs=10, valid_steps = 10, 
             step_epoch = 10, verbose=1, callbacks=callbacks,workers=-1)
 
 # Valid F1 score가 가장 잘나오는 베스트 
 
 valid_x, valid_y = data_loader.prediction_data()
+print("valid_x shape", valid_x.shape)
+
 y_pred = model.predict(valid_x)
 
 f1_list = []

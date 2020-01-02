@@ -37,7 +37,7 @@ class SimpleRNNModel:
 
     model = Model(model_input, model_output)
     model.compile(optimizer=adam(lr =0.001), loss=loss, metrics=['accuracy'])
-
+    print(model.summary())
     self.model = model
 
   def load(self, path):

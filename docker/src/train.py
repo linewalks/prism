@@ -3,12 +3,17 @@ import sys
 import numpy as np
 import pandas as pd
 
+import keras
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from data_loader import DataLoader
 from model import SimpleRNNModel
-from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
+from tensorflow.keras.callbacks import TensorBoard
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+
 from sklearn.metrics import f1_score, roc_auc_score
 
-data_path = sys.argv[1]
+# data_path = sys.argv[1]
+data_path = './data'
 
 task_id = os.environ.get('ID')
 if task_id is None:
@@ -30,29 +35,70 @@ print("Train Start")
 data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
                          common_path=os.path.join(data_path, 'volume'),
                          task_path=task_path)
-model = SimpleRNNModel(data_loader)
 
+
+class DataGenerator(keras.utils.Sequence):
+    'Generates data for Keras'
+    def __init__(self, data_loader, fraction):
+        'Initialization'
+        self.xt, self.yt,self.nx, self.ny = data_loader()
+        self.fraction = fraction
+        
+    def __len__(self):
+        'Denotes the number of batches per epoch'
+        return int(np.floor(len(self.nx) / 5))
+
+    def __getitem__(self, index):
+        'Generate one batch of data'
+        # Generate indexes of the batch
+            #positive_valid patient중 negative data undersampling    
+        rand_false2 = np.random.choice(self.nx.shape[0], size=int(np.floor(self.nx.shape[0]*self.fraction)))
+        random_nx = self.nx[rand_false2]
+        random_ny = self.ny[rand_false2]
+        
+        train_x = np.concatenate([self.xt,random_nx], axis=0)
+        train_y = np.concatenate([self.yt,random_ny], axis=0)
+            
+        if len(train_x) == len(train_y):
+            p = np.random.permutation(len(train_x))
+            train_x = train_x[p]
+            self.train_y = train_y[p]  
+        else:
+            print("there is non match")
+        self.train_x = pad_sequences(train_x, padding='post', value=-5)
+        return (self.train_x, self.train_y)   
+    
+    def shape(self):
+        return self.train_x.shape
+    
 callbacks = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
                     monitor='val_loss',
-                    checkpoint_mode='min',
-                    save_best_only=False,
+                    mode='min',
+                    save_best_only=True,
                     save_weights_only=False,
                     verbose=True
     ),
     TensorBoard(log_dir=task_log_path,
                 write_graph=True
-    )
+    ),
+     EarlyStopping(monitor='val_loss', min_delta=0, patience=50, verbose=2, mode='auto')
+
 ]
 
-model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
-            verbose=0,
-            epochs=10, batch_size=32,
-            callbacks=callbacks)
+traingen = DataGenerator(data_loader.get_train_data,fraction = 0.2)
+valid_gen = DataGenerator(data_loader.get_valid_data,fraction = 0.2)
+
+sample_x,sample_y = traingen.__getitem__(1)
+
+model = SimpleRNNModel(shape=sample_x.shape[2])
+
+model.train(traingen, valid_gen, epochs=200, valid_steps = 10, 
+            step_epoch = 10, verbose=0, callbacks=callbacks,workers=-1)
 
 # Valid F1 score가 가장 잘나오는 베스트 
 
-valid_x, valid_y = data_loader.get_valid_data()
+valid_x, valid_y = data_loader.prediction_data()
 y_pred = model.predict(valid_x)
 
 f1_list = []

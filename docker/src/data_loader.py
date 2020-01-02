@@ -7,6 +7,7 @@ from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.preprocessing import MinMaxScaler
 
 VALUE_MAP = ['HR','RR','SpO2','Pulse','Temp','ABPm','ABPd','ABPs','NBPm','NBPs','NBPd','SPO2-%','SPO2-R',
 'Resp','PVC','ST-II','etCO2','SpO2 r','imCO2','ST-V1','ST-I','ST-III','ST-aVF','ST-aVL','ST-aVR',
@@ -262,7 +263,11 @@ class DataLoader:
         new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
 
-
+    #minmax scale
+    scaler = MinMaxScaler(feature_range=(-1,1))
+    scaler = scaler.fit(measurement_df.iloc[:,3:])
+    measurement_df.iloc[:,3:] = scaler.transform(measurement_df.iloc[:,3:])
+    
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})
 
@@ -533,42 +538,69 @@ class DataLoader:
                                                                 test_size=self.valid_size,
                                                                 random_state=self.data_split_random_seed)
 
-    train_patient = np.concatenate([true_train_patient, false_train_patient])
+    true_t_xlist = self.x[self.key.SUBJECT_ID.isin(true_train_patient)]
+    true_v_xlist = self.x[self.key.SUBJECT_ID.isin(true_valid_patient)]
+    true_t_ylist = self.y[self.key.SUBJECT_ID.isin(true_train_patient)]
+    true_v_ylist = self.y[self.key.SUBJECT_ID.isin(true_valid_patient)]
+    
+    pos_t_number = np.where(true_t_ylist ==1)[0]
+    neg_t_number = np.where(true_t_ylist ==0)[0]
+    pos_v_number = np.where(true_v_ylist ==1)[0]
+    neg_v_number = np.where(true_v_ylist ==0)[0]
+    
+    self.true_xt = true_t_xlist[pos_t_number]
+    self.true_yt = true_t_ylist[pos_t_number]
+    false_xt = true_t_xlist[neg_t_number]
+    false_yt = true_t_ylist[neg_t_number]
+    
+    self.true_xv = true_v_xlist[pos_v_number]
+    self.true_yv = true_v_ylist[pos_v_number]
+    false_xv = true_v_xlist[neg_v_number]
+    false_yv = true_v_ylist[neg_v_number]
+        
+    neg_t_xlist = self.x[self.key.SUBJECT_ID.isin(false_train_patient)]
+    neg_t_ylist = self.y[self.key.SUBJECT_ID.isin(false_train_patient)]
+       
+    neg_v_xlist = self.x[self.key.SUBJECT_ID.isin(false_valid_patient)]
+    neg_v_ylist = self.y[self.key.SUBJECT_ID.isin(false_valid_patient)]
+        
+    self.train_nx = np.concatenate([false_xt,neg_t_xlist], axis=0)
+    self.train_ny = np.concatenate([false_yt,neg_t_ylist], axis=0)
+    self.valid_nx = np.concatenate([false_xv,neg_v_xlist], axis=0)
+    self.valid_ny = np.concatenate([false_yv,neg_v_ylist], axis=0)
+    
     valid_patient = np.concatenate([true_valid_patient, false_valid_patient])
 
-    self.train_x = self.x[self.key.SUBJECT_ID.isin(train_patient)]
-    self.train_y = self.y[self.key.SUBJECT_ID.isin(train_patient)]
+    pred_valid_x = self.x[self.key.SUBJECT_ID.isin(valid_patient)]
+    self.pred_valid_y = self.y[self.key.SUBJECT_ID.isin(valid_patient)]
 
-    self.valid_x = self.x[self.key.SUBJECT_ID.isin(valid_patient)]
-    self.valid_y = self.y[self.key.SUBJECT_ID.isin(valid_patient)]
-
+    self.pred_valid_x = pad_sequences(pred_valid_x, padding='post', value=-5)
+    
   def _train_split_data(self):
     try:
       self._stratified_shuffle()
     except ValueError:  # is sample data
-      self.train_x = self.x
-      self.train_y = self.y
-
-      self.valid_x = self.x
-      self.valid_y = self.y
-
-    self.train_x = pad_sequences(self.train_x)
-    self.valid_x = pad_sequences(self.valid_x)
+      print("valueError")
 
   def split_data(self):
     start_time = time.time()
     if self.is_train:
       self._train_split_data()
+      print("on_split")
     else:
-      self.train_x = pad_sequences(self.x)
+      self.infer_x = pad_sequences(self.x, padding='post', value=-5)
+      print("not_in_split")
 
     print("data_loader split_data time:", time.time() - start_time)
 
   def get_train_data(self):
-    return self.train_x, self.train_y
+    return self.true_xt, self.true_yt, self.train_nx, self.train_ny
 
   def get_valid_data(self):
-    return self.valid_x, self.valid_y
+    return self.true_xv, self.true_yv, self.valid_nx, self.valid_ny
 
   def get_infer_data(self):
-    return self.train_x
+    return self.infer_x
+
+  def prediction_data(self):
+        return self.pred_valid_x, self.pred_valid_y

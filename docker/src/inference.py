@@ -6,7 +6,8 @@ import pandas as pd
 from data_loader import DataLoader
 from model import SimpleRNNModel
 
-data_path = sys.argv[1]
+# data_path = sys.argv[1]
+data_path = './data'
 
 task_id = os.environ.get('ID')
 if task_id is None:
@@ -20,7 +21,10 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'test'),
                          common_path=os.path.join(data_path, 'volume'),
                          task_path=task_path,
                          is_train=False)
-model = SimpleRNNModel(data_loader)
+
+test_x = data_loader.get_infer_data()
+test_x.shape[2]
+model = SimpleRNNModel(shape=test_x.shape[2])
 
 # 모델 로드
 model.load(task_path)
@@ -31,7 +35,7 @@ thr_list = np.load(os.path.join(task_path, 'thr.npy'))
 thr = thr_list[np.argmax(f1_list)]
 
 y_key = data_loader.key
-y_pred = model.predict(data_loader.get_infer_data())
+y_pred = model.predict(test_x)
 y_pred = pd.DataFrame(y_pred, columns=['pred'])
 
 y_pred = pd.concat([y_key, y_pred], axis=1)

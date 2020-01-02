@@ -99,8 +99,8 @@ print("sample_x shape", sample_x.shape)
 
 model = SimpleRNNModel(shape=sample_x.shape[2])
 del sample_x
-model.train(traingen, valid_gen, epochs=10, valid_steps = 10, 
-            step_epoch = 10, verbose=1, callbacks=callbacks,workers=-1)
+model.train(traingen, valid_gen, epochs=200, valid_steps = 10, 
+            step_epoch = 10, verbose=2, callbacks=callbacks,workers=-1)
 
 # Valid F1 score가 가장 잘나오는 베스트 
 

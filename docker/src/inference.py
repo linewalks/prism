@@ -3,8 +3,8 @@ import sys
 import numpy as np
 import pandas as pd
 
-from docker.src.data_loader import DataLoader
-from docker.src.model import SimpleRNNModel
+from data_loader import DataLoader
+from model import SimpleRNNModel
 
 # data_path = sys.argv[1]
 data_path = './data'

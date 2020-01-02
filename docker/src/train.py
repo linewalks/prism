@@ -5,8 +5,8 @@ import pandas as pd
 
 import keras
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from docker.src.data_loader import DataLoader
-from docker.src.model import SimpleRNNModel
+from data_loader import DataLoader
+from model import SimpleRNNModel
 from tensorflow.keras.callbacks import TensorBoard
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 

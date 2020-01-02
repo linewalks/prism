@@ -26,6 +26,12 @@ cp person.csv data/train
 ./run.sh
 ```
 
+## model development
+
+```
+./dev.sh
+```
+
 ## docker export
 
 ```

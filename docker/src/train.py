@@ -34,6 +34,7 @@ print("Train Start")
 
 data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
                          common_path=os.path.join(data_path, 'volume'),
+                         is_train = True,
                          task_path=task_path)
 
 

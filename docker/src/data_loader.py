@@ -253,19 +253,28 @@ class DataLoader:
       # TODO
     group_cols = ['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP', 'MEASUREMENT_SOURCE_VALUE']
     agg_list = ['count', 'min', 'max', 'mean', 'std', 'var']
-    measurement_df = measurement_df.groupby(group_cols) \
-        .VALUE_AS_NUMBER.agg(agg_list)
+    measurement_df['VALUE_DIFF'] = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.diff()
 
-    measurement_df = measurement_df.unstack().reset_index().fillna(0)
+    measurement_diff_df = pd.pivot_table(measurement_df, 
+                                         values='VALUE_DIFF', index=group_cols[:-1],
+                                         columns='MEASUREMENT_SOURCE_VALUE', aggfunc=np.mean)
+    measurement_diff_df.columns = pd.MultiIndex.from_tuples([('diff', v) for v in measurement_diff_df.columns]) 
 
+    measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list).unstack()
+    measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index().fillna(0)
+
+    # 사용한 후 삭제
+    del measurement_diff_df
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
     new_cols = []
     for col in measurement_df.columns:
+      
       if col[1] == '':
         new_cols.append(col[0])
-      elif col[0] in agg_list:
+      elif col[0] in agg_list + ['diff']:
         new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
+
 
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})
@@ -345,7 +354,7 @@ class DataLoader:
       while True:
         if demographic_idx >= len(demographic_ary):
           break
-        
+
         demographic_row = demographic_ary[demographic_idx]
         demographic_person_id = demographic_row[0]
         # 시간 계산을 위해 tz를 동일하게 맞춤.

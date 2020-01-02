@@ -62,8 +62,16 @@ for thr in np.linspace(0, 1, 100):
   thr_list.append(thr)
 
 thr_idx = np.argmax(f1_list)
-print("Best Valid F1", np.max(f1_list), thr_list[thr_idx])
-print("Valid AUROC", roc_auc_score(valid_y, y_pred))
+score_f1 = np.max(f1_list)
+score_auroc = roc_auc_score(valid_y, y_pred)
+print("Best Valid F1", score_f1, thr_list[thr_idx])
+print("Valid AUROC", score_auroc)
+
+if score_auroc + score_f1 == 0:
+  score = 0
+else:
+  score = 2 * score_auroc * score_f1 / (score_auroc + score_f1)
+print("Valid Score", score)
 
 np.save(os.path.join(task_path, 'f1.npy'), f1_list)
 np.save(os.path.join(task_path, 'thr.npy'), thr_list)

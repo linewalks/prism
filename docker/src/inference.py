@@ -6,8 +6,8 @@ import pandas as pd
 from data_loader import DataLoader
 from model import SimpleRNNModel
 
-# data_path = sys.argv[1]
-data_path = './data'
+data_path = sys.argv[1]
+# data_path = './data'
 
 task_id = os.environ.get('ID')
 if task_id is None:

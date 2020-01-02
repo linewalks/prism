@@ -12,8 +12,11 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint
 
 from sklearn.metrics import f1_score, roc_auc_score
 
-data_path = sys.argv[1]
-# data_path = './data'
+
+try:
+    data_path = sys.argv[1]
+except IndexError:
+    data_path = './data'
 
 task_id = os.environ.get('ID')
 if task_id is None:

@@ -5,8 +5,8 @@ import pandas as pd
 
 import keras
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from data_loader import DataLoader
-from model import SimpleRNNModel
+from docker.src.data_loader import DataLoader
+from docker.src.model import SimpleRNNModel
 from tensorflow.keras.callbacks import TensorBoard
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 
@@ -94,7 +94,7 @@ sample_x,sample_y = traingen.__getitem__(1)
 model = SimpleRNNModel(shape=sample_x.shape[2])
 
 model.train(traingen, valid_gen, epochs=200, valid_steps = 10, 
-            step_epoch = 10, verbose=0, callbacks=callbacks,workers=-1)
+            step_epoch = 10, verbose=1, callbacks=callbacks,workers=-1)
 
 # Valid F1 score가 가장 잘나오는 베스트 
 

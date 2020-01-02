@@ -3,7 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import pytz
-from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
+from docker.src.measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences

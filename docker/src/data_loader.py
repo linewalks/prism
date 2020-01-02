@@ -43,10 +43,10 @@ dev_data = os.environ.get('DEV_DATA')
 if dev_data is None:
   dev_data = ''
 csv_files = {
-  'outcome': f'{dev_data}OUTCOME_COHORT.csv',
-  'measurement': f'{dev_data}MEASUREMENT_NICU.csv',
+  'person': f'{dev_data}PERSON_NICU.csv',
   'condition': f'{dev_data}CONDITION_OCCURRENCE_NICU.csv',
-  'person': f'{dev_data}PERSON_NICU.csv'
+  'measurement': f'{dev_data}MEASUREMENT_NICU.csv',
+  'outcome': f'{dev_data}OUTCOME_COHORT.csv'
 }
 
 

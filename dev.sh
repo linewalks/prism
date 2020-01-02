@@ -14,4 +14,4 @@ docker run -e ID=local_test -e DEV_DATA=dev \
   -v $src_dir:/src_dev \
   -it --rm \
   prism-tensorflow-1.14.0-gpu-py3 \
-  sh -c './train_dev.sh; ./inference_dev.sh'
+  sh -c './train_dev.sh'

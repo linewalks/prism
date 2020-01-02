@@ -7,35 +7,15 @@ from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.preprocessing import MinMaxScaler
 
+VALUE_MAP = ['HR','RR','SpO2','Pulse','Temp','ABPm','ABPd','ABPs','NBPm','NBPs','NBPd','SPO2-%','SPO2-R',
+'Resp','PVC','ST-II','etCO2','SpO2 r','imCO2','ST-V1','ST-I','ST-III','ST-aVF','ST-aVL','ST-aVR',
+'awRR','CVPm','AoM','ST-V2','ST-V3','ST-V4','ST-V5','ST-V6','SpO2T','T1','TV','Cdyn','PEEP','RRaw',
+'TVin','inO2','AoD','AoS','InsTi','MINVOL','MnAwP','PIP','MVin','PB','Poccl','Pplat',
+'MV','Patm','Ppeak','Rinsp','ST-V','sInsTi','sPEEP','sTV','sTrig','sPSV','Rexp','highP',
+'sAPkFl','sAWRR','sFIO2','sPIF','sMV','sO2','sRisTi','ARTd','ARTm','ARTs','PAPm','sSIMV']
 
-MEASUREMENT_SOURCE_VALUE_MAP = {
-    "IDBP": ["ARTd", "ABPd"],
-    "IMBP": ["ABPm"],
-    "ISBP": ["ARTs", "ABPs"],
-    "FDBP": ["AoD"],
-    "FMBP": ["AoS"],
-    "FSBP": ["AoS"],
-    "BT": ["Tskin", "Trect", "Tnaso", "Tesoph", "Temp", "Tcore"],
-    "CVP": ["CVPm"],
-    "ETCO2": ["etCO2"],
-    "PR": ["HR", "Pulse"],
-    "LAP": ["LAPm"],
-    "MINUTE_VOLUME": ["MINVOL", "MV"],
-    "PMEAN": ["MnAwP", "Pmean"],
-    "DBP": ["NBPd", "NBP-D"],
-    "MBP": ["NBPm", "NBP-M"],
-    "SBP": ["NBPs", "NBP-S"],
-    "DPAP": ["PAPd", "Pd"],
-    "MPAP": ["PAPm", "Pm"],
-    "SPAP": ["PAPs", "Ps"],
-    "PPEAK": ["PIP", "Ppeak"],
-    "RR": ["RR, Resp"],
-    "FREQ_MEASURE": ["RRaw"],
-    "SPO2": ["SpO2T", "SpO2-%", "SpO2"],
-    "VTE": ["TV"],
-    "VIT": ["TVin"]
-}
 
 MEASUREMENT_NORMALIZATION = ['mean', 'predefined']
 
@@ -148,16 +128,18 @@ class DataLoader:
                                  usecols=['PERSON_ID', 'MEASUREMENT_DATETIME',
                                           'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']
                                  )
-    if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
-      # source_value 맵핑
-      source_value_invert_map = {}
-      for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
-        for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
-          source_value_invert_map[table_value] = new_value
-      measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
+#     if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
+#       # source_value 맵핑
+#       source_value_invert_map = {}
+#       for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
+#         for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
+#           source_value_invert_map[table_value] = new_value
+#       measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
 
       # 맵핑이된 정보만 남긴다
-      measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
+            # 맵핑이된 정보만 남긴다
+    measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(VALUE_MAP)]
+
 
     # 컬럼 타입 설정
     measurement_df.MEASUREMENT_DATETIME = pd.to_datetime(measurement_df.MEASUREMENT_DATETIME, utc=True)
@@ -257,12 +239,18 @@ class DataLoader:
 
     measurement_diff_df = pd.pivot_table(measurement_df, 
                                          values='VALUE_DIFF', index=group_cols[:-1],
-                                         columns='MEASUREMENT_SOURCE_VALUE', aggfunc=np.mean)
-    measurement_diff_df.columns = pd.MultiIndex.from_tuples([('diff', v) for v in measurement_diff_df.columns]) 
+                                         columns='MEASUREMENT_SOURCE_VALUE', aggfunc=['mean','max','min'])
 
-    measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list).unstack()
-    measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index().fillna(0)
+    measurement_diff_df.columns = [('diff', '{}_{}'.format(v[0],v[1])) for v in measurement_diff_df.columns]
 
+    measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list). \
+    fillna(0).unstack().fillna(method='ffill').fillna(method='bfill')
+
+    measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index()
+
+    if measurement_df.isnull().sum().sum() >0:
+        print("there is Na after interpolation")
+        measurement_df = measurement_df.fillna(0)
     # 사용한 후 삭제
     del measurement_diff_df
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
@@ -275,7 +263,11 @@ class DataLoader:
         new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
 
-
+    #minmax scale
+    scaler = MinMaxScaler(feature_range=(-1,1))
+    scaler = scaler.fit(measurement_df.iloc[:,3:])
+    measurement_df.iloc[:,3:] = scaler.transform(measurement_df.iloc[:,3:])
+    
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})
 
@@ -394,9 +386,9 @@ class DataLoader:
         if measurement_person_id > person_id:       # 다음 환자로 넘어감
           state = 2
         elif measurement_person_id == person_id:
-          if measurement_date > date:               # 다음 날짜로 넘어감
+          if measurement_date.date() > date:               # 다음 날짜로 넘어감
             state = 2
-          elif measurement_date == date:
+          elif measurement_date.date() == date:
             if measurement_hourgrp > hourgrp:       # 다음 그룹시간으로 넘어감
               state = 2
             elif measurement_hourgrp == hourgrp:    # 맞는 데이터
@@ -432,9 +424,9 @@ class DataLoader:
         if condition_person_id > person_id:       # 다음 환자로 넘어감
           state = 2
         elif condition_person_id == person_id:
-          if condition_date > date:               # 다음 날짜로 넘어감
+          if condition_date.date() > date:               # 다음 날짜로 넘어감
             state = 2
-          elif condition_date == date:
+          elif condition_date.date() == date:
             if condition_hourgrp > hourgrp:       # 다음 그룹시간으로 넘어감
               state = 2
             elif condition_hourgrp == hourgrp:    # 맞는 데이터
@@ -546,42 +538,69 @@ class DataLoader:
                                                                 test_size=self.valid_size,
                                                                 random_state=self.data_split_random_seed)
 
-    train_patient = np.concatenate([true_train_patient, false_train_patient])
+    true_t_xlist = self.x[self.key.SUBJECT_ID.isin(true_train_patient)]
+    true_v_xlist = self.x[self.key.SUBJECT_ID.isin(true_valid_patient)]
+    true_t_ylist = self.y[self.key.SUBJECT_ID.isin(true_train_patient)]
+    true_v_ylist = self.y[self.key.SUBJECT_ID.isin(true_valid_patient)]
+    
+    pos_t_number = np.where(true_t_ylist ==1)[0]
+    neg_t_number = np.where(true_t_ylist ==0)[0]
+    pos_v_number = np.where(true_v_ylist ==1)[0]
+    neg_v_number = np.where(true_v_ylist ==0)[0]
+    
+    self.true_xt = true_t_xlist[pos_t_number]
+    self.true_yt = true_t_ylist[pos_t_number]
+    false_xt = true_t_xlist[neg_t_number]
+    false_yt = true_t_ylist[neg_t_number]
+    
+    self.true_xv = true_v_xlist[pos_v_number]
+    self.true_yv = true_v_ylist[pos_v_number]
+    false_xv = true_v_xlist[neg_v_number]
+    false_yv = true_v_ylist[neg_v_number]
+        
+    neg_t_xlist = self.x[self.key.SUBJECT_ID.isin(false_train_patient)]
+    neg_t_ylist = self.y[self.key.SUBJECT_ID.isin(false_train_patient)]
+       
+    neg_v_xlist = self.x[self.key.SUBJECT_ID.isin(false_valid_patient)]
+    neg_v_ylist = self.y[self.key.SUBJECT_ID.isin(false_valid_patient)]
+        
+    self.train_nx = np.concatenate([false_xt,neg_t_xlist], axis=0)
+    self.train_ny = np.concatenate([false_yt,neg_t_ylist], axis=0)
+    self.valid_nx = np.concatenate([false_xv,neg_v_xlist], axis=0)
+    self.valid_ny = np.concatenate([false_yv,neg_v_ylist], axis=0)
+    
     valid_patient = np.concatenate([true_valid_patient, false_valid_patient])
 
-    self.train_x = self.x[self.key.SUBJECT_ID.isin(train_patient)]
-    self.train_y = self.y[self.key.SUBJECT_ID.isin(train_patient)]
+    pred_valid_x = self.x[self.key.SUBJECT_ID.isin(valid_patient)]
+    self.pred_valid_y = self.y[self.key.SUBJECT_ID.isin(valid_patient)]
 
-    self.valid_x = self.x[self.key.SUBJECT_ID.isin(valid_patient)]
-    self.valid_y = self.y[self.key.SUBJECT_ID.isin(valid_patient)]
-
+    self.pred_valid_x = pad_sequences(pred_valid_x, padding='post', value=-5)
+    
   def _train_split_data(self):
     try:
       self._stratified_shuffle()
     except ValueError:  # is sample data
-      self.train_x = self.x
-      self.train_y = self.y
-
-      self.valid_x = self.x
-      self.valid_y = self.y
-
-    self.train_x = pad_sequences(self.train_x)
-    self.valid_x = pad_sequences(self.valid_x)
+      print("valueError")
 
   def split_data(self):
     start_time = time.time()
     if self.is_train:
       self._train_split_data()
+      print("on_split")
     else:
-      self.train_x = pad_sequences(self.x)
+      self.infer_x = pad_sequences(self.x, padding='post', value=-5)
+      print("not_in_split")
 
     print("data_loader split_data time:", time.time() - start_time)
 
   def get_train_data(self):
-    return self.train_x, self.train_y
+    return self.true_xt, self.true_yt, self.train_nx, self.train_ny
 
   def get_valid_data(self):
-    return self.valid_x, self.valid_y
+    return self.true_xv, self.true_yv, self.valid_nx, self.valid_ny
 
   def get_infer_data(self):
-    return self.train_x
+    return self.infer_x
+
+  def prediction_data(self):
+        return self.pred_valid_x, self.pred_valid_y

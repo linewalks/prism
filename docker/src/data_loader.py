@@ -322,7 +322,7 @@ class DataLoader:
         autoen.train(train_measure.iloc[:,3:],
                      valid_measure.iloc[:,3:], 
                      epochs = 120, 
-                     batch_size = int(np.floor(len(train_measure.iloc[:,3:]))),
+                     batch_size = int(np.floor(len(train_measure.iloc[:,3:])/5)),
                      verbose = 2,
                     callbacks = callbacks)
         

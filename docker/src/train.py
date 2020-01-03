@@ -11,6 +11,7 @@ from tensorflow.keras.callbacks import TensorBoard
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 
 from sklearn.metrics import f1_score, roc_auc_score
+import datetime
 
 
 try:
@@ -39,7 +40,6 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
                          common_path=os.path.join(data_path, 'volume'),
                          is_train = True,
                          task_path=task_path)
-
 
 class DataGenerator(keras.utils.Sequence):
     'Generates data for Keras'
@@ -76,7 +76,7 @@ class DataGenerator(keras.utils.Sequence):
         return self.train_x.shape
     
 callbacks = [
-    ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
+    ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:.2f}.hdf5'),
                     monitor='val_loss',
                     mode='min',
                     save_best_only=True,
@@ -86,26 +86,31 @@ callbacks = [
     TensorBoard(log_dir=task_log_path,
                 write_graph=True
     ),
-     EarlyStopping(monitor='val_loss', min_delta=0, patience=50, verbose=2, mode='auto')
+     EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=2, mode='auto')
 
 ]
-
+ # data generation 
 traingen = DataGenerator(data_loader.get_train_data,fraction = 0.2)
 valid_gen = DataGenerator(data_loader.get_valid_data,fraction = 0.2)
 
 sample_x,sample_y = traingen.__getitem__(1)
 print("sample_x shape", sample_x.shape)
+print("sample_y positive percents", sample_y.sum()/len(sample_y))
 
-
+print("time before model train",datetime.datetime.now())
 model = SimpleRNNModel(shape=sample_x.shape[2])
-del sample_x
-model.train(traingen, valid_gen, epochs=200, valid_steps = 10, 
-            step_epoch = 10, verbose=2, callbacks=callbacks,workers=-1)
+del sample_x #memory save 
+
+# model train 
+
+model.train(traingen, valid_gen, epochs=50, valid_steps = 10, 
+            step_epoch = 10, verbose=2, callbacks=callbacks, workers=-1)
 
 # Valid F1 score가 가장 잘나오는 베스트 
 
 valid_x, valid_y = data_loader.prediction_data()
 print("valid_x shape", valid_x.shape)
+print("valid_x shape", valid_y.sum()/len(valid_y))
 
 y_pred = model.predict(valid_x)
 
@@ -118,14 +123,14 @@ for thr in np.linspace(0, 1, 100):
 thr_idx = np.argmax(f1_list)
 score_f1 = np.max(f1_list)
 score_auroc = roc_auc_score(valid_y, y_pred)
-print("Best Valid F1", score_f1, thr_list[thr_idx])
-print("Valid AUROC", score_auroc)
+print("Best Valid F1 :", score_f1, thr_list[thr_idx])
+print("Valid AUROC :", score_auroc)
 
 if score_auroc + score_f1 == 0:
   score = 0
 else:
   score = 2 * score_auroc * score_f1 / (score_auroc + score_f1)
-print("Valid Score", score)
+print("total Score : ", score)
 
 np.save(os.path.join(task_path, 'f1.npy'), f1_list)
 np.save(os.path.join(task_path, 'thr.npy'), thr_list)

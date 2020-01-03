@@ -25,7 +25,8 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'test'),
                          is_train=False)
 
 test_x = data_loader.get_infer_data()
-test_x.shape[2]
+print("test X.shape : ", test_x.shape[2])
+
 model = SimpleRNNModel(shape=test_x.shape[2])
 
 # 모델 로드

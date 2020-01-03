@@ -8,6 +8,10 @@ from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from sklearn.preprocessing import MinMaxScaler
+from model import Autoencoder
+from keras.models import Model
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.layers import Input
 
 VALUE_MAP = ['HR','RR','SpO2','Pulse','Temp','ABPm','ABPd','ABPs','NBPm','NBPs','NBPd','SPO2-%','SPO2-R',
 'Resp','PVC','ST-II','etCO2','SpO2 r','imCO2','ST-V1','ST-I','ST-III','ST-aVF','ST-aVL','ST-aVR',
@@ -28,6 +32,7 @@ class DataLoader:
                measurement_normalize='mean',
                condition_min_limit=0, condition_group=False,
                valid_size=0.2, data_split_random_seed=1235, pytest=False):
+    
     self.data_path = data_path
     self.common_path = common_path
     self.task_path = task_path
@@ -46,7 +51,7 @@ class DataLoader:
     self.data_split_random_seed = data_split_random_seed
     if not pytest:
       self.extract_from_file()
-
+        
   def extract_from_file(self):
 
     # 각 테이블에서 필요한 정보만 남기고 정리
@@ -56,10 +61,13 @@ class DataLoader:
     self.person_df = self.extract_person()
     self.condition_df = self.extract_condition()
     self.measurement_df = self.extract_measurement()
-
+    
     # 데이터를 시간대별로 Group
     self.groupby_hour()
-
+    
+    # 데이터를 autoencoder로 embedding함. 
+    self.measurement_df = self.autoencoder(self.measurement_df)
+    
     # 환자별 시간 시퀀스 데이터를 만듦
     self.make_person_sequence()
 
@@ -199,6 +207,7 @@ class DataLoader:
       condition_df = pd.concat(new_condition_list, axis=1)
       condition_df.columns = condition_cols
     print("data_loader groupby_hour_condition time:", time.time() - start_time)
+    print("condition_shape : ", condition_df.shape)
     return condition_df
 
   def _clip_measurement(self, measurement_source_value, value_as_number):
@@ -263,10 +272,10 @@ class DataLoader:
         new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
 
-    #minmax scale
-    scaler = MinMaxScaler(feature_range=(-1,1))
-    scaler = scaler.fit(measurement_df.iloc[:,3:])
-    measurement_df.iloc[:,3:] = scaler.transform(measurement_df.iloc[:,3:])
+#     #minmax scale
+#     scaler = MinMaxScaler(feature_range=(-1,1))
+#     scaler = scaler.fit(measurement_df.iloc[:,3:])
+#     measurement_df.iloc[:,3:] = scaler.transform(measurement_df.iloc[:,3:])
     
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})
@@ -288,8 +297,52 @@ class DataLoader:
       measurement_df = pd.concat(new_measurement_list, axis=1)
       measurement_df.columns = measurement_cols
     print("data_loader groupby_hour_measurement time:", time.time() - start_time)
+    
     return measurement_df
 
+  def autoencoder(self, measurement_df):
+    if self.is_train:
+        start_time = time.time()
+        train_measure, valid_measure = train_test_split(measurement_df,
+                                                                  train_size=(1 - self.valid_size),
+                                                                  test_size=self.valid_size)
+        autoen = Autoencoder(train_measure.iloc[:,3:])
+        
+        callbacks = [
+    ModelCheckpoint(filepath=os.path.join(self.task_path, 'encoder-{epoch:02d}-{val_loss:.2f}.hdf5'),
+                    monitor='val_loss',
+                    mode='min',
+                    save_best_only=True,
+                    save_weights_only=False,
+                    verbose=True
+    ),
+     EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=2, mode='auto')
+]
+
+        autoen.train(train_measure.iloc[:,3:],
+                     valid_measure.iloc[:,3:], 
+                     epochs = 120, 
+                     batch_size = int(np.floor(len(train_measure.iloc[:,3:]))),
+                     verbose = 2,
+                    callbacks = callbacks)
+        
+        output=pd.DataFrame(autoen.predict(measurement_df.iloc[:,3:]))
+        measurement_df = pd.concat([measurement_df.iloc[:,:3], output],axis=1)
+        print("data_loader autoencoder time:", time.time() - start_time)
+        return measurement_df
+
+
+    else:
+        start_time = time.time()
+        autoen = Autoencoder(measurement_df.iloc[:,3:])
+        autoen.load(self.task_path)
+        
+        output=pd.DataFrame(autoen.predict(measurement_df.iloc[:,3:]))
+        measurement_df = pd.concat([measurement_df.iloc[:,:3], output],axis=1)
+        print("data_loader autoencoder.predict time:", time.time() - start_time)
+
+        return measurement_df
+    
   def make_person_sequence(self):
     start_time = time.time()
     # 환자별로 데이터의 시작시간과 종료시간을 구한다.

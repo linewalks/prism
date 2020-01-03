@@ -43,10 +43,11 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
 
 class DataGenerator(keras.utils.Sequence):
     'Generates data for Keras'
-    def __init__(self, data_loader, fraction):
+    def __init__(self, data_loader, fraction, repeat):
         'Initialization'
         self.xt, self.yt,self.nx, self.ny = data_loader()
         self.fraction = fraction
+        self.repeat = repeat
         
     def __len__(self):
         'Denotes the number of batches per epoch'
@@ -60,8 +61,11 @@ class DataGenerator(keras.utils.Sequence):
         random_nx = self.nx[rand_false2]
         random_ny = self.ny[rand_false2]
         
-        train_x = np.concatenate([self.xt,random_nx], axis=0)
-        train_y = np.concatenate([self.yt,random_ny], axis=0)
+        xt = np.repeat(self.xt, self.repeat, axis=0)
+        yt = np.repeat(self.yt, self.repeat, axis=0)
+        
+        train_x = np.concatenate([xt,random_nx], axis=0)
+        train_y = np.concatenate([yt,random_ny], axis=0)
             
         if len(train_x) == len(train_y):
             p = np.random.permutation(len(train_x))
@@ -90,8 +94,8 @@ callbacks = [
 
 ]
  # data generation 
-traingen = DataGenerator(data_loader.get_train_data,fraction = 0.2)
-valid_gen = DataGenerator(data_loader.get_valid_data,fraction = 0.2)
+traingen = DataGenerator(data_loader.get_train_data,fraction = 0.1, repeat = 5)
+valid_gen = DataGenerator(data_loader.get_valid_data,fraction = 0.1, repeat = 5)
 
 sample_x,sample_y = traingen.__getitem__(1)
 print("sample_x shape", sample_x.shape)

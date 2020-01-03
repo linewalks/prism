@@ -3,15 +3,17 @@ import time
 import numpy as np
 import pandas as pd
 import pytz
-from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from sklearn.preprocessing import MinMaxScaler
-from model import Autoencoder
 from keras.models import Model
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers import Input
+
+from model import Autoencoder
+from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
+
 
 VALUE_MAP = ['HR','RR','SpO2','Pulse','Temp','ABPm','ABPd','ABPs','NBPm','NBPs','NBPd','SPO2-%','SPO2-R',
 'Resp','PVC','ST-II','etCO2','SpO2 r','imCO2','ST-V1','ST-I','ST-III','ST-aVF','ST-aVL','ST-aVR',
@@ -321,7 +323,7 @@ class DataLoader:
 
         autoen.train(train_measure.iloc[:,3:],
                      valid_measure.iloc[:,3:], 
-                     epochs = 120, 
+                     epochs = 200, 
                      batch_size = int(np.floor(len(train_measure.iloc[:,3:])/5)),
                      verbose = 2,
                     callbacks = callbacks)

@@ -272,10 +272,10 @@ class DataLoader:
         new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
 
-#     #minmax scale
-#     scaler = MinMaxScaler(feature_range=(-1,1))
-#     scaler = scaler.fit(measurement_df.iloc[:,3:])
-#     measurement_df.iloc[:,3:] = scaler.transform(measurement_df.iloc[:,3:])
+    #minmax scale
+    scaler = MinMaxScaler(feature_range=(-1,1))
+    scaler = scaler.fit(measurement_df.iloc[:,3:])
+    measurement_df.iloc[:,3:] = scaler.transform(measurement_df.iloc[:,3:])
     
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})

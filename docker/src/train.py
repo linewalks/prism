@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from data_loader import DataLoader
-from model import SimpleRNNModel
+from model import SimpleRNNModel, HurcyModel
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from sklearn.metrics import f1_score, roc_auc_score
 
@@ -29,8 +29,9 @@ print("Train Start")
 
 data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
                          common_path=os.path.join(data_path, 'volume'),
-                         task_path=task_path)
-model = SimpleRNNModel(data_loader)
+                         task_path=task_path,
+                         group_hour=1,
+                         timestep_per_data=96)
 
 callbacks = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
@@ -45,6 +46,9 @@ callbacks = [
     )
 ]
 
+model = HurcyModel(data_loader,
+                   class_weight={0: 0.1, 1: 0.9},
+                   is_bias=True)
 model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
             epochs=10, batch_size=32,

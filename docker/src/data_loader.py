@@ -14,13 +14,31 @@ from keras.layers import Input
 from model import Autoencoder
 from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 
-
-VALUE_MAP = ['HR','RR','SpO2','Pulse','Temp','ABPm','ABPd','ABPs','NBPm','NBPs','NBPd','SPO2-%','SPO2-R',
-'Resp','PVC','ST-II','etCO2','SpO2 r','imCO2','ST-V1','ST-I','ST-III','ST-aVF','ST-aVL','ST-aVR',
-'awRR','CVPm','AoM','ST-V2','ST-V3','ST-V4','ST-V5','ST-V6','SpO2T','T1','TV','Cdyn','PEEP','RRaw',
-'TVin','inO2','AoD','AoS','InsTi','MINVOL','MnAwP','PIP','MVin','PB','Poccl','Pplat',
-'MV','Patm','Ppeak','Rinsp','ST-V','sInsTi','sPEEP','sTV','sTrig','sPSV','Rexp','highP',
-'sAPkFl','sAWRR','sFIO2','sPIF','sMV','sO2','sRisTi','ARTd','ARTm','ARTs','PAPm','sSIMV']
+MEASUREMENT_SOURCE_VALUE_MAP = {
+    "IDBP": ["ARTd", "ABPd"],
+    "IMBP": ["ABPm"],
+    "ISBP": ["ARTs", "ABPs"],
+    "FDBP": ["AoD"],
+    "FMBP": ["AoS"],
+    "FSBP": ["AoS"],
+    "BT": ["Temp"],
+    "CVP": ["CVPm"],
+    "ETCO2": ["etCO2"],
+    "PR": ["HR", "Pulse"],
+    "LAP": ["LAPm"],
+    "MINUTE_VOLUME": ["MINVOL", "MV"],
+    "PMEAN": ["MnAwP"],
+    "DBP": ["NBPd"],
+    "MBP": ["NBPm"],
+    "SBP": ["NBPs"],
+    "MPAP": ["PAPm"],
+    "PPEAK": ["PIP", "Ppeak"],
+    "RR": ["RR, Resp"],
+    "FREQ_MEASURE": ["RRaw"],
+    "SPO2": ["SpO2T", "SpO2-%", "SpO2"],
+    "VTE": ["TV"],
+    "VIT": ["TVin"]
+}
 
 
 MEASUREMENT_NORMALIZATION = ['mean', 'predefined']
@@ -138,17 +156,17 @@ class DataLoader:
                                  usecols=['PERSON_ID', 'MEASUREMENT_DATETIME',
                                           'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']
                                  )
-#     if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
-#       # source_value 맵핑
-#       source_value_invert_map = {}
-#       for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
-#         for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
-#           source_value_invert_map[table_value] = new_value
-#       measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
+    if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
+      # source_value 맵핑
+      source_value_invert_map = {}
+      for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
+        for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
+          source_value_invert_map[table_value] = new_value
+      measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
 
-      # 맵핑이된 정보만 남긴다
-            # 맵핑이된 정보만 남긴다
-    measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(VALUE_MAP)]
+
+             # 맵핑이된 정보만 남긴다
+      measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
 
 
     # 컬럼 타입 설정

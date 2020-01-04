@@ -7,6 +7,7 @@ from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.feature_extraction.text import TfidfTransformer
 
 
 MEASUREMENT_SOURCE_VALUE_MAP = {
@@ -57,7 +58,8 @@ class DataLoader:
                group_hour=1, timestep_per_data=128,
                measurement_normalize='mean',
                condition_min_limit=0, condition_group=False,
-               valid_size=0.2, data_split_random_seed=1235, pytest=False):
+               valid_size=0.2, data_split_random_seed=1235,
+               pytest=False, tfidf=False):
     self.data_path = data_path
     self.common_path = common_path
     self.task_path = task_path
@@ -74,6 +76,7 @@ class DataLoader:
 
     self.valid_size = valid_size
     self.data_split_random_seed = data_split_random_seed
+    self.tfidf = tfidf
     if not pytest:
       self.extract_from_file()
 
@@ -327,6 +330,9 @@ class DataLoader:
     demographic_cols = ["AGE_HOUR", "GENDER"]
     condition_cols = self.condition_df.columns[3:]
     measurement_cols = self.measurement_df.columns[3:]
+
+    if self.tfidf:
+      condition_ary[:, 3:] = TfidfTransformer().fit_transform(condition_ary[:, 3:]).toarray()
 
     # 빈 Time Range 없게 시간대 정보를 채움
     max_hourgrp = (24 // self.group_hour) - 1

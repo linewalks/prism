@@ -31,7 +31,8 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
                          common_path=os.path.join(data_path, 'volume'),
                          task_path=task_path,
                          group_hour=1,
-                         timestep_per_data=48)
+                         timestep_per_data=48,
+                         tfidf=True)
 
 callbacks = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),

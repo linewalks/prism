@@ -296,3 +296,4 @@ def generate_dev_data(n=3, n_cond= 5, n_msmt=5):
   print(condition_df.shape)
   print(measurement_df.shape)
   print(outcome_df.shape)
+ 

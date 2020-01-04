@@ -7,6 +7,7 @@ from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.preprocessing import MinMaxScaler
 
 
 MEASUREMENT_SOURCE_VALUE_MAP = {
@@ -253,6 +254,7 @@ class DataLoader:
                                     columns={'VALUE_AS_NUMBER': 'MEAN_VALUE'}),
                                 on='MEASUREMENT_SOURCE_VALUE', how='left')
       measurement_df.VALUE_AS_NUMBER = measurement_df.VALUE_AS_NUMBER / measurement_df.MEAN_VALUE
+        
     # 생체신호 범위를 이용하여 Normalize
     elif self.measurement_normalize == MEASUREMENT_NORMALIZATION[1]:
       measurement_df.VALUE_AS_NUMBER = measurement_df.apply(lambda row:
@@ -273,7 +275,7 @@ class DataLoader:
 
     measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list).unstack()
     measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index().fillna(0)
-
+    
     # 사용한 후 삭제
     del measurement_diff_df
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
@@ -285,11 +287,14 @@ class DataLoader:
       elif col[0] in agg_list + ['diff']:
         new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
-
-
+    
+    #minmax scale
+    scaler = MinMaxScaler(feature_range=(-1,1))
+    measurement_df.iloc[:,3:] = scaler.fit_transform(measurement_df.iloc[:,3:])
+    
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})
-
+    
     measurement_col_filename = os.path.join(self.task_path, 'measurement_cols.npy')
     if self.is_train:
       # 컬럼 이름 저장

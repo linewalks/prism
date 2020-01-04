@@ -4,11 +4,14 @@ import numpy as np
 import pandas as pd
 
 from data_loader import DataLoader
-from model import SimpleRNNModel
-from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
+from model import Autoencoder
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.metrics import f1_score, roc_auc_score
 
-data_path = sys.argv[1]
+try:
+    data_path = sys.argv[1]
+except IndexError:
+    data_path = './data'
 
 task_id = os.environ.get('ID')
 if task_id is None:
@@ -30,30 +33,47 @@ print("Train Start")
 data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
                          common_path=os.path.join(data_path, 'volume'),
                          task_path=task_path)
-model = SimpleRNNModel(data_loader)
+
+print("train_x shape : ", data_loader.train_x.shape)
+
+autoencoder = Autoencoder(data_loader, training = True)
+
+callbacks = [
+    ModelCheckpoint(filepath=os.path.join(task_path, 'encoder-{epoch:02d}-{val_loss:2f}.hdf5'),
+                    monitor='val_loss',
+                    mode='min',
+                    save_best_only=True,
+                    save_weights_only=False,
+                    verbose=True
+    )
+]
+
+autoencoder.train(data_loader.get_train_data(), data_loader.get_valid_data(),
+            verbose=0,
+            epochs=5, batch_size=32,
+            callbacks=callbacks)
+
+autoencoder.RNNmodel()
 
 callbacks = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
                     monitor='val_loss',
-                    checkpoint_mode='min',
-                    save_best_only=False,
+                    mode='min',
+                    save_best_only=True,
                     save_weights_only=False,
                     verbose=True
-    ),
-    TensorBoard(log_dir=task_log_path,
-                write_graph=True
     )
 ]
-
-model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
+autoencoder.rnntrain(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
-            epochs=10, batch_size=32,
+            epochs=5, batch_size=32,
             callbacks=callbacks)
+
 
 # Valid F1 score가 가장 잘나오는 베스트 
 
 valid_x, valid_y = data_loader.get_valid_data()
-y_pred = model.predict(valid_x)
+y_pred = autoencoder.predict(valid_x)
 
 f1_list = []
 thr_list = []

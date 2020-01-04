@@ -8,9 +8,7 @@ from model import SimpleRNNModel
 
 data_path = sys.argv[1]
 
-task_id = os.environ.get('ID')
-if task_id is None:
-  task_id = 'local_test'
+task_id = os.environ.get('ID', 'local_test')
 
 task_path = os.path.join(data_path, 'volume', task_id)
 

@@ -40,9 +40,7 @@ MEASUREMENT_SOURCE_VALUE_MAP = {
 
 MEASUREMENT_NORMALIZATION = ['mean', 'predefined']
 
-dev_data = os.environ.get('DEV_DATA')
-if dev_data is None:
-  dev_data = ''
+dev_data = os.environ.get('DEV_DATA', '')
 csv_files = {
   'person': f'{dev_data}PERSON_NICU.csv',
   'condition': f'{dev_data}CONDITION_OCCURRENCE_NICU.csv',

@@ -50,7 +50,7 @@ callbacks = [
 
 autoencoder.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
-            epochs=5, batch_size=32,
+            epochs=20, batch_size=32,
             callbacks=callbacks)
 
 autoencoder.RNNmodel()
@@ -66,7 +66,7 @@ callbacks = [
 ]
 autoencoder.rnntrain(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
-            epochs=5, batch_size=32,
+            epochs=20, batch_size=32,
             callbacks=callbacks)
 
 

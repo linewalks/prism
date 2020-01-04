@@ -48,9 +48,16 @@ callbacks = [
     )
 ]
 
-autoencoder.train(data_loader.get_train_data(), data_loader.get_valid_data(),
+shape_x = data_loader.get_train_data()[0].shape
+train_x = data_loader.get_train_data()[0].reshape(-1,shape_x[2])
+
+shape_v = data_loader.get_valid_data()[0].shape
+valid_x = data_loader.get_valid_data()[0].reshape(-1,shape_v[2])
+
+
+autoencoder.train(train_x, valid_x,
             verbose=0,
-            epochs=20, batch_size=32,
+            epochs=20, batch_size=len(train_x)//5,
             callbacks=callbacks)
 
 autoencoder.RNNmodel()
@@ -66,7 +73,7 @@ callbacks = [
 ]
 autoencoder.rnntrain(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
-            epochs=20, batch_size=32,
+            epochs=20, batch_size=len(data_loader.get_train_data()[0])//5,
             callbacks=callbacks)
 
 

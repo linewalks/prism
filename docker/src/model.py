@@ -25,12 +25,14 @@ class Autoencoder:
     #인코딩될 표현(representation)의 크기
 #     encoding_dims=[3,6,9,12]
     # 입력 플레이스홀더
-    input_img = Input(shape=(self.data_loader.train_x.shape[1],self.data_loader.train_x.shape[2],))
-    x = GRU(32,activation = 'tanh',
-              return_sequences=True)(input_img)
-    
-    output = Dense(self.data_loader.train_x.shape[2], activation ='tanh')(x)
-    
+    input_img = Input(shape=(self.data_loader.train_x.shape[2],))
+    x = Dense(128,activation = 'tanh')(input_img)
+    x = Dense(84,activation = 'relu')(x)
+    x = Dense(64,activation = 'relu')(x)
+    x = Dense(84,activation = 'tanh')(x)
+
+    output = Dense(self.data_loader.train_x.shape[2])(x)
+
     # 입력을 입력의 재구성으로 매핑할 모델
     autoencoder = Model(input_img, output)
 
@@ -51,9 +53,9 @@ class Autoencoder:
 
   def train(self, train_data, valid_data, epochs, batch_size, verbose, callbacks):
 
-    self.model.fit(train_data[0], train_data[0], batch_size=batch_size, 
+    self.model.fit(train_data, train_data, batch_size=batch_size, 
                                         epochs=epochs, verbose=verbose, 
-                                        validation_data=(valid_data[0], valid_data[0]),
+                                        validation_data=(valid_data, valid_data),
                                         callbacks=callbacks)
 
   def rnn_load(self, path):
@@ -68,9 +70,16 @@ class Autoencoder:
    
     input_img = Input(shape=(self.data_loader.train_x.shape[1], self.data_loader.train_x.shape[2],))
     layer1 = self.model.layers[1]
+    layer2 = self.model.layers[2]
+    layer3 = self.model.layers[3]
+
     layer1.trainable = False
-    
+    layer2.trainable = False
+    layer3.trainable = False
+
     x = layer1(input_img)
+    x = layer2(x)
+    x = layer3(x)
     x = GRU(32, activation = 'relu') (x)
     x = Dense(16, activation = 'relu') (x)
     x = BatchNormalization()(x)

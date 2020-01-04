@@ -6,7 +6,7 @@ import pytz
 from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+from keras.preprocessing.sequence import pad_sequences
 from sklearn.preprocessing import MinMaxScaler
 
 
@@ -254,7 +254,7 @@ class DataLoader:
                                     columns={'VALUE_AS_NUMBER': 'MEAN_VALUE'}),
                                 on='MEASUREMENT_SOURCE_VALUE', how='left')
       measurement_df.VALUE_AS_NUMBER = measurement_df.VALUE_AS_NUMBER / measurement_df.MEAN_VALUE
-        
+#       self.data_style = measurement_df.copy()
     # 생체신호 범위를 이용하여 Normalize
     elif self.measurement_normalize == MEASUREMENT_NORMALIZATION[1]:
       measurement_df.VALUE_AS_NUMBER = measurement_df.apply(lambda row:
@@ -288,10 +288,11 @@ class DataLoader:
         new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
     
-    #minmax scale
-    scaler = MinMaxScaler(feature_range=(-1,1))
-    measurement_df.iloc[:,3:] = scaler.fit_transform(measurement_df.iloc[:,3:])
+#     self.data_pre = measurement_df.copy()
     
+
+#     self.data_post = measurement_df.copy()
+
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})
     
@@ -353,6 +354,8 @@ class DataLoader:
            (cur_date == end_date and cur_hourgrp >= end_hourgrp):
           # 끝까지 탐색함
           break
+            
+    self.demo = demographic_ary.copy()
 
     # 시간대 정보에 따라 데이터를 채워 넣는다
     demographic_idx = condition_idx = measurement_idx = 0
@@ -378,7 +381,9 @@ class DataLoader:
             pytz.utc) - demographic_row[1]
         demographic_gender = demographic_row[2]
         demographic_data = [demographic_age.total_seconds() // 3600., demographic_gender]
+        
 
+        
         state = 0       # 0: 다음 데이터 탐색 1: 맞는 데이터 찾음 2: 맞는 데이터 없음
         if demographic_person_id > person_id:       # 다음 환자로 넘어감
           state = 2
@@ -581,16 +586,35 @@ class DataLoader:
       self.valid_x = self.x
       self.valid_y = self.y
 
-    self.train_x = pad_sequences(self.train_x)
-    self.valid_x = pad_sequences(self.valid_x)
+    train_x = pad_sequences(self.train_x, padding='post',value=np.nan, dtype='float32')
+    valid_x = pad_sequences(self.valid_x, padding='post',value=np.nan, dtype='float32')
 
+    train_x = self.scaling(train_x)
+    valid_x = self.scaling(valid_x)
+    
+    self.train_x = np.nan_to_num(train_x,nan =-5)
+    self.valid_x = np.nan_to_num(valid_x,nan =-5)
+    
+  def scaling(self, target):
+    #minmax scale
+    scaler = MinMaxScaler(feature_range=(-1,1))
+    target_shape = target.shape
+    
+    target = target.reshape(target_shape[0],-1)
+    target = scaler.fit_transform(target)
+    target = target.reshape(target_shape)
+    
+    return target
+    
   def split_data(self):
     start_time = time.time()
     if self.is_train:
       self._train_split_data()
     else:
-      self.train_x = pad_sequences(self.x)
-
+      train_x = pad_sequences(self.x, padding='post',value=np.nan, dtype='float32')
+      train_x = self.scaling(train_x)
+      self.train_x = np.nan_to_num(train_x,nan =-5)  
+    
     print("data_loader split_data time:", time.time() - start_time)
 
   def get_train_data(self):

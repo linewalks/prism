@@ -1,10 +1,15 @@
 import os
 import tensorflow as tf
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import GRU, Input, Masking, Dropout, Dense, Activation
+from tensorflow.keras.layers import GRU, Input, Masking, Dropout, Dense, Activation, Lambda
 from tensorflow.keras.initializers import TruncatedNormal
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import load_model
+
+from tensorflow.keras import backend as K
+from transformer.transformer import TransformerBlock
+from transformer.position import TransformerCoordinateEmbedding
+
 
 
 class SimpleRNNModel:
@@ -15,28 +20,39 @@ class SimpleRNNModel:
 
   def build_model(self):
     
-    model_input = Input((None, self.data_loader.train_x.shape[2]))
+    model_input = Input((self.data_loader.train_x.shape[1], self.data_loader.train_x.shape[2]))
     x = model_input
     
-    x = Masking(mask_value=0.0)(x)
+    # x = Masking(mask_value=0.0)(x)
 
-    rnn_layers = [64]
-    for idx, node in enumerate(rnn_layers):
-      return_sequences = False if idx == len(rnn_layers) - 1 else True
+    transformer_block = TransformerBlock(
+        name='transformer',
+        num_heads=self.data_loader.train_x.shape[2],
+        residual_dropout=0.1,
+        attention_dropout=0.1,
+        use_masking=True)
 
-      x = GRU(node,
-              return_sequences=return_sequences)(x)
-      x = Dropout(0.3)(x)
-
+    transformer_depth = 1
+    add_coordinate_embedding = TransformerCoordinateEmbedding(
+        transformer_depth,
+        name='coordinate_embedding')
+ 
+    for idx in range(transformer_depth):
+      x = add_coordinate_embedding(x, step=idx)
+      x = transformer_block(x)
+      
+    x = Lambda(lambda x: K.squeeze(x[:, -1:, :], axis=1))(x)
     x = Dense(1, kernel_initializer=TruncatedNormal(stddev=0.01))(x)
 
     model_output = Activation('sigmoid')(x)
     loss = 'binary_crossentropy'
 
-    optimizer = Adam(learning_rate=0.001)
+    optimizer = Adam(learning_rate=0.0005)
 
     model = Model(model_input, model_output)
     model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
+
+    model.summary()
 
     self.model = model
 

@@ -45,7 +45,9 @@ callbacks = [
                     save_best_only=True,
                     save_weights_only=False,
                     verbose=True
-    )
+    ),
+    EarlyStopping(monitor='val_loss', min_delta=0, patience=5, 
+                                   verbose=0, mode='auto')
 ]
 
 shape_x = data_loader.get_train_data()[0].shape
@@ -57,7 +59,7 @@ valid_x = data_loader.get_valid_data()[0].reshape(-1,shape_v[2])
 
 autoencoder.train(train_x, valid_x,
             verbose=0,
-            epochs=500, batch_size=len(train_x)//5,
+            epochs=200, batch_size=20000,
             callbacks=callbacks)
 
 autoencoder.RNNmodel()
@@ -69,11 +71,13 @@ callbacks = [
                     save_best_only=True,
                     save_weights_only=False,
                     verbose=True
-    )
+    ),
+    EarlyStopping(monitor='val_loss', min_delta=0, patience=5, 
+                                   verbose=0, mode='auto')
 ]
 autoencoder.rnntrain(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
-            epochs=100, batch_size=len(data_loader.get_train_data()[0])//5,
+            epochs=50, batch_size=len(data_loader.get_train_data()[0])//5,
             callbacks=callbacks)
 
 

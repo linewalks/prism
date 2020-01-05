@@ -598,11 +598,9 @@ class DataLoader:
     train_x = pad_sequences(self.train_x, padding='post',value=np.nan, dtype='float32')
     valid_x = pad_sequences(self.valid_x, padding='post',value=np.nan, dtype='float32')
 
-    train_x = self.scaling(train_x)
-    valid_x = self.scaling(valid_x)
+    self.train_x = self.scaling(train_x)
+    self.valid_x = self.scaling(valid_x)
     
-    self.train_x = np.nan_to_num(train_x,nan =-5)
-    self.valid_x = np.nan_to_num(valid_x,nan =-5)
     
   def scaling(self, target):
     #minmax scale
@@ -612,7 +610,7 @@ class DataLoader:
     target = target.reshape(target_shape[0],-1)
     target = scaler.fit_transform(target)
     target = target.reshape(target_shape)
-    
+    target = np.nan_to_num(target, nan =-5)
     return target
     
   def split_data(self):
@@ -621,8 +619,7 @@ class DataLoader:
       self._train_split_data()
     else:
       train_x = pad_sequences(self.x, padding='post',value=np.nan, dtype='float32')
-      train_x = self.scaling(train_x)
-      self.train_x = np.nan_to_num(train_x,nan =-5)  
+      self.train_x = self.scaling(train_x)
     
     print("data_loader split_data time:", time.time() - start_time)
 

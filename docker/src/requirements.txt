@@ -4,3 +4,4 @@ pytest
 scikit-learn
 dotmap
 keras
+numpy

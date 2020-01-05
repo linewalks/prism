@@ -26,12 +26,12 @@ class Autoencoder:
 #     encoding_dims=[3,6,9,12]
     # 입력 플레이스홀더
     input_img = Input(shape=(self.data_loader.train_x.shape[2],))
-    x = Dense(128,activation = 'tanh')(input_img)
-    x = Dense(84,activation = 'relu')(x)
-    x = Dense(64,activation = 'relu')(x)
-    x = Dense(84,activation = 'tanh')(x)
+    encoder1 = Dense(256,activation = 'tanh')(input_img)
+    encoder2 = Dense(128,activation = 'relu')(encoder1)
+    encoder3 = Dense(128,activation = 'relu')(encoder2)
+    decoder1 = Dense(84,activation = 'tanh')(encoder3)
 
-    output = Dense(self.data_loader.train_x.shape[2])(x)
+    output = Dense(self.data_loader.train_x.shape[2])(decoder1)
 
     # 입력을 입력의 재구성으로 매핑할 모델
     autoencoder = Model(input_img, output)
@@ -76,8 +76,9 @@ class Autoencoder:
     layer1.trainable = False
     layer2.trainable = False
     layer3.trainable = False
+    mask = Masking(mask_value = -5)(input_img)
 
-    x = layer1(input_img)
+    x = layer1(mask)
     x = layer2(x)
     x = layer3(x)
     x = GRU(32, activation = 'relu') (x)

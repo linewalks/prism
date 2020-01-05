@@ -177,7 +177,7 @@ class DataLoader:
 #       # 맵핑이된 정보만 남긴다
 #       measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
 
-      measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(VALUE_MAP)]
+    measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(VALUE_MAP)]
         
         
     # 컬럼 타입 설정

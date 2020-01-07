@@ -7,6 +7,7 @@ from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+import talib
 
 
 MEASUREMENT_SOURCE_VALUE_MAP = {
@@ -78,7 +79,6 @@ class DataLoader:
       self.extract_from_file()
 
   def extract_from_file(self):
-    
     print('Load files', csv_files)
     # 각 테이블에서 필요한 정보만 남기고 정리
     # - 불필요 컬럼 제거
@@ -87,7 +87,7 @@ class DataLoader:
     self.person_df = self.extract_person()
     self.condition_df = self.extract_condition()
     self.measurement_df = self.extract_measurement()
-
+    
     # 데이터를 시간대별로 Group
     self.groupby_hour()
 
@@ -188,6 +188,42 @@ class DataLoader:
     self.condition_df = self.groupby_hour_condition(self.condition_df)
     self.measurement_df = self.groupby_hour_measurement(self.measurement_df)
 
+    # 주식거래시 보조지표 추가
+    test_columns = self.measurement_df.drop(columns=['PERSON_ID', 'DATE', 'HOURGRP']).columns
+    test_columns = [
+      ('BT', 'min'),    ('DBP', 'min'),
+      ('IDBP', 'min'),   ('IMBP', 'min'),   ('ISBP', 'min'),
+      ('MBP', 'min'),     ('PR', 'min'),     ('RR', 'min'),
+      ('SBP', 'min'),   ('SPO2', 'min'),
+    ]
+    supplement_indicator_value = []
+    supplement_indicator_col_name = []
+    for test_column in test_columns:
+      supplement_indicator_value.extend(talib.BBANDS(self.measurement_df[test_column], 24, 2))
+      supplement_indicator_value.append(talib.SMA(self.measurement_df[test_column],12))
+      supplement_indicator_value.append(talib.SMA(self.measurement_df[test_column],24))
+      supplement_indicator_value.append(talib.RSI(self.measurement_df[test_column], 12))
+      supplement_indicator_value.append(talib.MACD(self.measurement_df[test_column], 12, 26, 9)[0])
+      supplement_indicator_value.append(talib.WMA(self.measurement_df[test_column], 12))
+      supplement_indicator_value.append(talib.EMA(self.measurement_df[test_column], 12))
+      supplement_indicator_col_name.extend([
+        f'{test_column}_ubb',
+        f'{test_column}_mbb',
+        f'{test_column}_lbb',
+        f'{test_column}_sma12',
+        f'{test_column}_sma24',
+        f'{test_column}_rsi12',
+        f'{test_column}_mace',
+        f'{test_column}_wma12',
+        f'{test_column}_ema12'
+      ])
+    
+
+    supplement_indicator_value = pd.concat(supplement_indicator_value, axis=1).fillna(0)
+    supplement_indicator_value.columns = supplement_indicator_col_name
+    self.measurement_df = pd.concat([self.measurement_df, supplement_indicator_value], axis=1)    
+    self.measurement_df = self.measurement_df.fillna(0)
+
   def groupby_hour_condition(self, condition_df):
     start_time = time.time()
 
@@ -239,6 +275,7 @@ class DataLoader:
 
   def groupby_hour_measurement(self, measurement_df):
     start_time = time.time()
+
     # timestamp로 join 하기 위하여 시간 포맷을 utc로 통일
     measurement_df['MEASUREMENT_DATE'] = measurement_df.MEASUREMENT_DATETIME.dt.date
     measurement_df['MEASUREMENT_DATE'] = pd.to_datetime(measurement_df.MEASUREMENT_DATE, utc=True)

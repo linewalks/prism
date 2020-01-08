@@ -6,7 +6,7 @@ import pandas as pd
 from data_loader import DataLoader
 from model import SimpleRNNModel
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
-from sklearn.metrics import f1_score, roc_auc_score
+from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score
 
 data_path = sys.argv[1]
 
@@ -50,7 +50,7 @@ model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             epochs=10, batch_size=32,
             callbacks=callbacks)
 
-# Valid F1 score가 가장 잘나오는 베스트 
+# Valid F1 score가 가장 잘나오는 베스트
 
 valid_x, valid_y = data_loader.get_valid_data()
 y_pred = model.predict(valid_x)
@@ -58,13 +58,15 @@ y_pred = model.predict(valid_x)
 f1_list = []
 thr_list = []
 for thr in np.linspace(0, 1, 100):
-  f1_list.append(f1_score(valid_y, y_pred > thr))
+  f1_list.append(f1_score(valid_y, y_pred > thr, average='weighted'))
   thr_list.append(thr)
 
 thr_idx = np.argmax(f1_list)
 score_f1 = np.max(f1_list)
 score_auroc = roc_auc_score(valid_y, y_pred)
 print("Best Valid F1", score_f1, thr_list[thr_idx])
+print("Precision", precision_score(valid_y, y_pred > thr_list[thr_idx]))
+print("Recall   ", recall_score(valid_y, y_pred > thr_list[thr_idx]))
 print("Valid AUROC", score_auroc)
 
 if score_auroc + score_f1 == 0:

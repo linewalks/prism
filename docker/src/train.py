@@ -6,7 +6,7 @@ import pandas as pd
 from data_loader import DataLoader
 from model import SimpleRNNModel
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
-from sklearn.metrics import f1_score, roc_auc_score
+from sklearn.metrics import f1_score, roc_auc_score, recall_score, precision_score
 
 data_path = sys.argv[1]
 
@@ -62,7 +62,13 @@ def print_score(data_x, data_y, data_type):
   thr_idx = np.argmax(f1_list)
   score_f1 = np.max(f1_list)
   score_auroc = roc_auc_score(data_y, y_pred)
-  print("Best", data_type, "F1", score_f1, thr_list[thr_idx])
+
+  thr = thr_list[thr_idx]
+  score_precision = precision_score(data_y, y_pred > thr)
+  score_recall = recall_score(data_y, y_pred > thr)
+  print("Best", data_type, "F1", score_f1)
+  print("Best", data_type, "F1 Precision", score_precision)
+  print("Best", data_type, "F1 Recall", score_recall)
   print(data_type, "AUROC", score_auroc)
   
   if score_auroc + score_f1 == 0:
@@ -80,7 +86,7 @@ valid_x, valid_y = data_loader.get_valid_data()
 train_f1, train_thr = print_score(train_x, train_y, 'Train')
 valid_f1, valid_thr = print_score(valid_x, valid_y, 'Valid')
 
-np.save(os.path.join(task_path, 'f1.npy'), train_f1)
-np.save(os.path.join(task_path, 'thr.npy'), train_thr)
+np.save(os.path.join(task_path, 'f1.npy'), valid_f1)
+np.save(os.path.join(task_path, 'thr.npy'), valid_thr)
 
 print("Train Done")

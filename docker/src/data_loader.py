@@ -576,8 +576,8 @@ class DataLoader:
       self.valid_x = self.x
       self.valid_y = self.y
 
-    self.train_x = pad_sequences(self.train_x)
-    self.valid_x = pad_sequences(self.valid_x)
+    self.train_x = pad_sequences(self.train_x, dtype=np.float32)
+    self.valid_x = pad_sequences(self.valid_x, dtype=np.float32)
 
   def split_data(self):
     start_time = time.time()

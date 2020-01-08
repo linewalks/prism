@@ -45,14 +45,23 @@ callbacks = [
     )
 ]
 
-model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
+hist = model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
             epochs=10, batch_size=32,
             callbacks=callbacks)
 
+keys = hist.history.keys()
+print_keys = [key.replace('val_', 'v_') for key in (['epoch'] + list(keys))]
+print("\t".join(print_keys))
+for idx in range(len(hist.history['loss'])):
+  log_list = [str(idx+1)]
+  for key in keys:
+    log_list.append("%.4f" % hist.history[key][idx])
+  
+  print("\t".join(log_list))
 
 def print_score(data_x, data_y, data_type):
-  y_pred = model.predict(data_x)
+  y_pred = model.predict(data_x, batch_size=1024)
   f1_list = []
   thr_list = []
   for thr in np.linspace(0, 1, 100):
@@ -69,6 +78,7 @@ def print_score(data_x, data_y, data_type):
   print("Best", data_type, "F1", score_f1)
   print("Best", data_type, "F1 Precision", score_precision)
   print("Best", data_type, "F1 Recall", score_recall)
+  print("Best", data_type, "F1 Threshold", thr)
   print(data_type, "AUROC", score_auroc)
   
   if score_auroc + score_f1 == 0:

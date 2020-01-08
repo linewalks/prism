@@ -239,6 +239,11 @@ class DataLoader:
 
   def groupby_hour_measurement(self, measurement_df):
     start_time = time.time()
+    # add cyclical time features
+    seconds_in_day = 24 * 60 * 60
+    measurement_df['DATE_SIN'] = np.sin(2*np.pi*measurement_df.MEASUREMENT_DATETIME.dt.second/seconds_in_day)
+    measurement_df['DATE_COS'] = np.cos(2*np.pi*measurement_df.MEASUREMENT_DATETIME.dt.second/seconds_in_day)
+
     # timestamp로 join 하기 위하여 시간 포맷을 utc로 통일
     measurement_df['MEASUREMENT_DATE'] = measurement_df.MEASUREMENT_DATETIME.dt.date
     measurement_df['MEASUREMENT_DATE'] = pd.to_datetime(measurement_df.MEASUREMENT_DATE, utc=True)
@@ -267,8 +272,10 @@ class DataLoader:
     agg_list = ['count', 'min', 'max', 'mean', 'std', 'var',
                 'mad', 'prod', 'skew']
     
+    measurement_cyclical_df = measurement_df.groupby(group_cols[:-1])[['DATE_SIN','DATE_COS']].agg('mean')#.unstack()
+    measurement_cyclical_df.columns = pd.MultiIndex.from_tuples([('cyclical', v) for v in measurement_cyclical_df.columns])
     measurement_df['VALUE_DIFF'] = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.diff()
-
+    
     measurement_diff_df = pd.pivot_table(measurement_df, 
                                          values='VALUE_DIFF', index=group_cols[:-1],
                                          columns='MEASUREMENT_SOURCE_VALUE', aggfunc=np.mean)
@@ -278,11 +285,12 @@ class DataLoader:
     measurement_kurt_df.columns = pd.MultiIndex.from_tuples([('kurt', v) for v in measurement_kurt_df.columns])
 
     measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list).unstack()
-    measurement_df = pd.concat([measurement_df, measurement_diff_df, measurement_kurt_df], axis=1).reset_index().fillna(0)
+    measurement_df = pd.concat([measurement_df, measurement_diff_df, measurement_kurt_df, measurement_cyclical_df], axis=1).reset_index().fillna(0)
 
     # 사용한 후 삭제
     del measurement_diff_df
     del measurement_kurt_df
+    del measurement_cyclical_df
 
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
     new_cols = []
@@ -290,7 +298,7 @@ class DataLoader:
       
       if col[1] == '':
         new_cols.append(col[0])
-      elif col[0] in agg_list + ['diff', 'kurt']:
+      elif col[0] in agg_list + ['diff', 'kurt', 'cyclical']:
         new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
 

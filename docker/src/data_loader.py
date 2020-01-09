@@ -242,10 +242,10 @@ class DataLoader:
   def add_supplementary_indicator(self, measurement_df):
     # test_columns = measurement_df.drop(columns=['PERSON_ID', 'DATE', 'HOURGRP']).columns
     test_columns = [
-      ('BT', 'min'),    ('DBP', 'min'),
-      ('IDBP', 'min'),   ('IMBP', 'min'),   ('ISBP', 'min'),
-      ('MBP', 'min'),     ('PR', 'min'),     ('RR', 'min'),
-      ('SBP', 'min'),   ('SPO2', 'min'),
+      ('BT', 'max'),    ('DBP', 'max'),
+      ('IDBP', 'max'),   ('IMBP', 'max'),   ('ISBP', 'max'),
+      ('MBP', 'max'),     ('PR', 'max'),     ('RR', 'max'),
+      ('SBP', 'max'),   ('SPO2', 'max'),
     ]
     supplement_indicator_value = []
     supplement_indicator_col_name = []
@@ -302,7 +302,7 @@ class DataLoader:
 
       # TODO
     group_cols = ['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP', 'MEASUREMENT_SOURCE_VALUE']
-    agg_list = ['count', 'min', 'max', 'mean', 'std', 'var']
+    agg_list = ['count', 'min', 'max', 'mean', 'std']
     measurement_df['VALUE_DIFF'] = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.diff()
 
     measurement_diff_df = pd.pivot_table(measurement_df, 

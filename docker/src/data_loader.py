@@ -302,26 +302,34 @@ class DataLoader:
 
       # TODO
     group_cols = ['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP', 'MEASUREMENT_SOURCE_VALUE']
-    agg_list = ['count', 'min', 'max', 'mean', 'std']
+
+    agg_list = ['count', 'min', 'max', 'mean', 'std',
+                'mad', 'prod', 'skew']
+    
     measurement_df['VALUE_DIFF'] = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.diff()
 
     measurement_diff_df = pd.pivot_table(measurement_df, 
                                          values='VALUE_DIFF', index=group_cols[:-1],
                                          columns='MEASUREMENT_SOURCE_VALUE', aggfunc=np.mean)
-    measurement_diff_df.columns = pd.MultiIndex.from_tuples([('diff', v) for v in measurement_diff_df.columns]) 
+    measurement_diff_df.columns = pd.MultiIndex.from_tuples([('diff', v) for v in measurement_diff_df.columns])
+
+    measurement_kurt_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.apply(pd.DataFrame.kurt).unstack()
+    measurement_kurt_df.columns = pd.MultiIndex.from_tuples([('kurt', v) for v in measurement_kurt_df.columns])
 
     measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list).unstack()
-    measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index().fillna(0)
+    measurement_df = pd.concat([measurement_df, measurement_diff_df, measurement_kurt_df], axis=1).reset_index().fillna(0)
 
     # 사용한 후 삭제
     del measurement_diff_df
+    del measurement_kurt_df
+
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
     new_cols = []
     for col in measurement_df.columns:
       
       if col[1] == '':
         new_cols.append(col[0])
-      elif col[0] in agg_list + ['diff']:
+      elif col[0] in agg_list + ['diff', 'kurt']:
         new_cols.append((col[1], col[0]))
     measurement_df.columns = new_cols
 
@@ -618,8 +626,8 @@ class DataLoader:
       self.valid_x = self.x
       self.valid_y = self.y
 
-    self.train_x = pad_sequences(self.train_x)
-    self.valid_x = pad_sequences(self.valid_x)
+    self.train_x = pad_sequences(self.train_x, dtype=np.float32)
+    self.valid_x = pad_sequences(self.valid_x, dtype=np.float32)
 
   def split_data(self):
     start_time = time.time()

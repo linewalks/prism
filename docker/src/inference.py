@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 
 from data_loader import DataLoader
-from model import SimpleRNNModel
+from model import SimpleRNNModel, f1, f1_loss
+from tensorflow.keras.utils import get_custom_objects
 
 data_path = sys.argv[1]
 
@@ -23,6 +24,10 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'test'),
 model = SimpleRNNModel(data_loader)
 
 # 모델 로드
+
+get_custom_objects().update({"f1_loss": f1_loss})
+get_custom_objects().update({"f1": f1})
+
 model.load(task_path)
 
 # threhshold

@@ -13,21 +13,22 @@ cp condition_occurrence.csv data/train
 cp measurement.csv data/train
 cp person.csv data/train
 ```
+## run
 
-## docker build
-
+필요한 라이브러리 설치 (최초 한번만)
 ```
-./build.sh
-```
-
-## docker run
-
-```
-./run.sh
+pip install -r docker/src/requirements.txt
 ```
 
-## docker export
+로컬 환경에서 모델 실행
+```
+python docker/src/train.py ./data/
+```
+
+## docker preparation
 
 ```
-./zip.sh
+./build.sh; ./zip.sh
 ```
+
+이후 생성되는 압축파일을 업로드하면 됩니다.

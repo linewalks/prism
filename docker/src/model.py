@@ -49,7 +49,7 @@ class SimpleRNNModel:
     self.model = load_model(model_path)
 
   def train(self, train_data, valid_data, epochs=10, verbose=0, batch_size=32, callbacks=[]):
-    self.model.fit(train_data[0], train_data[1],
+    return self.model.fit(train_data[0], train_data[1],
                    epochs=epochs,
                    verbose=verbose,
                    batch_size=batch_size,
@@ -57,5 +57,5 @@ class SimpleRNNModel:
                    callbacks=callbacks
                    )
   
-  def predict(self, infer_x):
-    return self.model.predict(infer_x)
+  def predict(self, infer_x, batch_size=None):
+    return self.model.predict(infer_x, batch_size=batch_size)

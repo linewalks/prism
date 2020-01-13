@@ -138,7 +138,7 @@ class HurcyModel:
         loss = f1_loss
         # loss = 'binary_crossentropy'
 
-        optimizer = Adam(learning_rate=0.01)
+        optimizer = Adam(learning_rate=0.02)
 
         model = Model(model_input, model_output)
         model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy', f1])

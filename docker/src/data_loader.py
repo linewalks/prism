@@ -354,7 +354,7 @@ class DataLoader:
       measurement_df = pd.concat(new_measurement_list, axis=1)
       measurement_df.columns = measurement_cols
     
-    measurement_df = self.add_supplementary_indicator(measurement_df)
+    # measurement_df = self.add_supplementary_indicator(measurement_df)
     print("data_loader groupby_hour_measurement time:", time.time() - start_time)
     print(measurement_df.columns)
     return measurement_df

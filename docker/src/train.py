@@ -52,7 +52,7 @@ model = HurcyModel(data_loader,
 hist = model.train(data_loader.get_train_data(),
                    data_loader.get_valid_data(),
                    verbose=0,
-                   epochs=20,
+                   epochs=500,
                    batch_size=32,
                    callbacks=callbacks)
 

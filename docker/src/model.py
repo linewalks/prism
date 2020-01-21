@@ -2,7 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import GRU, Input, Masking, Dropout, Dense, Activation
+from tensorflow.keras.layers import GRU, Input, Masking, Dropout, Dense, Activation, Conv1D
 from tensorflow.compat.v1.keras.initializers import TruncatedNormal
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import load_model
@@ -50,6 +50,9 @@ class SimpleRNNModel:
         x = model_input
 
         x = Masking(mask_value=0.0)(x)
+        x = Conv1D(filters=32, kernel_size=5,
+                   strides=1, padding="causal",
+                   activation='relu', input_shape=(None, 1))(x)
 
         rnn_layers = [64]
         for idx, node in enumerate(rnn_layers):
@@ -61,11 +64,11 @@ class SimpleRNNModel:
 
         x = Dense(1, kernel_initializer=TruncatedNormal(stddev=0.01))(x)
 
-        model_output = Activation('sigmoid')(x)
+        model_output = Activation('relu')(x)
         loss = f1_loss
         # loss = 'binary_crossentropy'
 
-        optimizer = Adam(learning_rate=0.001)
+        optimizer = Adam(learning_rate=1e-8)
 
         model = Model(model_input, model_output)
         model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy', f1])

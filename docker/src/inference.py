@@ -49,8 +49,8 @@ model.load(task_path)
 # threhshold
 f1_list = np.load(os.path.join(task_path, 'f1.npy'))
 thr_list = np.load(os.path.join(task_path, 'thr.npy'))
-# thr = thr_list[np.argmax(f1_list)]
-thr = 0.02
+thr = thr_list[np.argmax(f1_list)]
+# thr = 0.02
 y_key = data_loader.key
 y_pred = model.predict(data_loader.get_infer_data())
 y_pred = pd.DataFrame(y_pred, columns=['pred'])

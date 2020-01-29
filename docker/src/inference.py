@@ -4,13 +4,9 @@ import numpy as np
 import pandas as pd
 
 from data_loader import DataLoader
-from model import Autoencoder
+from model import SimpleRNNModel
 
-try:
-    data_path = sys.argv[1]
-except IndexError:
-    data_path = './data'
-
+data_path = sys.argv[1]
 
 task_id = os.environ.get('ID')
 if task_id is None:
@@ -24,10 +20,10 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'test'),
                          common_path=os.path.join(data_path, 'volume'),
                          task_path=task_path,
                          is_train=False)
-autoencoder = Autoencoder(data_loader, training = False)
+model = SimpleRNNModel(data_loader)
 
 # 모델 로드
-autoencoder.rnn_load(task_path)
+model.load(task_path)
 
 # threhshold
 f1_list = np.load(os.path.join(task_path, 'f1.npy'))
@@ -35,7 +31,7 @@ thr_list = np.load(os.path.join(task_path, 'thr.npy'))
 thr = thr_list[np.argmax(f1_list)]
 
 y_key = data_loader.key
-y_pred = autoencoder.predict(data_loader.get_infer_data())
+y_pred = model.predict(data_loader.get_infer_data())
 y_pred = pd.DataFrame(y_pred, columns=['pred'])
 
 y_pred = pd.concat([y_key, y_pred], axis=1)

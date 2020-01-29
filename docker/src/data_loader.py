@@ -6,8 +6,7 @@ import pytz
 from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
-from keras.preprocessing.sequence import pad_sequences
-from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
 MEASUREMENT_SOURCE_VALUE_MAP = {
@@ -37,12 +36,6 @@ MEASUREMENT_SOURCE_VALUE_MAP = {
     "VTE": ["TV"],
     "VIT": ["TVin"]
 }
-VALUE_MAP = ['HR','RR','SpO2','Pulse','Temp','ABPm','ABPd','ABPs','NBPm','NBPs','NBPd','SPO2-%','SPO2-R',
-'Resp','PVC','ST-II','etCO2','SpO2 r','imCO2','ST-V1','ST-I','ST-III','ST-aVF','ST-aVL','ST-aVR',
-'awRR','CVPm','AoM','ST-V2','ST-V3','ST-V4','ST-V5','ST-V6','SpO2T','T1','TV','Cdyn','PEEP','RRaw',
-'TVin','inO2','AoD','AoS','InsTi','MINVOL','MnAwP','PIP','MVin','PB','Poccl','Pplat',
-'MV','Patm','Ppeak','Rinsp','ST-V','sInsTi','sPEEP','sTV','sTrig','sPSV','Rexp','highP',
-'sAPkFl','sAWRR','sFIO2','sPIF','sMV','sO2','sRisTi','ARTd','ARTm','ARTs','PAPm','sSIMV']
 
 MEASUREMENT_NORMALIZATION = ['mean', 'predefined']
 
@@ -85,7 +78,7 @@ class DataLoader:
       self.extract_from_file()
 
   def extract_from_file(self):
-    
+
     print('Load files', csv_files)
     # 각 테이블에서 필요한 정보만 남기고 정리
     # - 불필요 컬럼 제거
@@ -161,25 +154,22 @@ class DataLoader:
 
   def extract_measurement(self):
     start_time = time.time()
-    measurement_df = pd.read_csv(os.path.join(self.data_path, csv_files['measurement']), 
+    measurement_df = pd.read_csv(os.path.join(self.data_path, csv_files['measurement']),
                                  encoding='windows-1252',
                                  usecols=['PERSON_ID', 'MEASUREMENT_DATETIME',
                                           'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']
                                  )
-#     if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
-#       # source_value 맵핑
-#       source_value_invert_map = {}
-#       for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
-#         for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
-#           source_value_invert_map[table_value] = new_value
-#       measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
+    if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
+      # source_value 맵핑
+      source_value_invert_map = {}
+      for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
+        for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
+          source_value_invert_map[table_value] = new_value
+      measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
 
-#       # 맵핑이된 정보만 남긴다
-#       measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
+      # 맵핑이된 정보만 남긴다
+      measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
 
-    measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(VALUE_MAP)]
-        
-        
     # 컬럼 타입 설정
     measurement_df.MEASUREMENT_DATETIME = pd.to_datetime(measurement_df.MEASUREMENT_DATETIME, utc=True)
 
@@ -263,7 +253,6 @@ class DataLoader:
                                     columns={'VALUE_AS_NUMBER': 'MEAN_VALUE'}),
                                 on='MEASUREMENT_SOURCE_VALUE', how='left')
       measurement_df.VALUE_AS_NUMBER = measurement_df.VALUE_AS_NUMBER / measurement_df.MEAN_VALUE
-#       self.data_style = measurement_df.copy()
     # 생체신호 범위를 이용하여 Normalize
     elif self.measurement_normalize == MEASUREMENT_NORMALIZATION[1]:
       measurement_df.VALUE_AS_NUMBER = measurement_df.apply(lambda row:
@@ -274,37 +263,43 @@ class DataLoader:
 
       # TODO
     group_cols = ['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP', 'MEASUREMENT_SOURCE_VALUE']
-    agg_list = ['count', 'min', 'max', 'mean', 'std', 'var']
+
+    agg_list = ['count', 'min', 'max', 'mean', 'std', 'var',
+                'mad', 'prod', 'skew']
+
     measurement_df['VALUE_DIFF'] = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.diff()
 
-    measurement_diff_df = pd.pivot_table(measurement_df, 
+    measurement_diff_df = pd.pivot_table(measurement_df,
                                          values='VALUE_DIFF', index=group_cols[:-1],
-                                         columns='MEASUREMENT_SOURCE_VALUE', aggfunc=np.mean)
-    measurement_diff_df.columns = pd.MultiIndex.from_tuples([('diff', v) for v in measurement_diff_df.columns]) 
+                                         columns='MEASUREMENT_SOURCE_VALUE', aggfunc=['mean','max','min'])
+    measurement_diff_df.columns = pd.MultiIndex.from_tuples([('diff', v) for v in measurement_diff_df.columns])
+
+    measurement_kurt_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.apply(pd.DataFrame.kurt).unstack()
+    measurement_kurt_df.columns = pd.MultiIndex.from_tuples([('kurt', v) for v in measurement_kurt_df.columns])
 
     measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list).unstack()
-    measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index().fillna(0)
-    
+    measurement_df = pd.concat([measurement_df, measurement_diff_df, measurement_kurt_df], axis=1).reset_index().fillna(0)
+
     # 사용한 후 삭제
     del measurement_diff_df
+    del measurement_kurt_df
+
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
     new_cols = []
     for col in measurement_df.columns:
-      
-      if col[1] == '':
-        new_cols.append(col[0])
-      elif col[0] in agg_list + ['diff']:
-        new_cols.append((col[1], col[0]))
-    measurement_df.columns = new_cols
-    
-#     self.data_pre = measurement_df.copy()
-    
+        if col[1] =="":
+            new_cols.append(col[0])
 
-#     self.data_post = measurement_df.copy()
+        elif col[0] in agg_list + ['kurt']:
+            new_cols.append((col[1], col[0]))
+        elif col[0] =="diff":
+            new_cols.append((col[1][0]+"diff",col[1][1]))
+    measurement_df.columns = new_cols
+
 
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})
-    
+
     measurement_col_filename = os.path.join(self.task_path, 'measurement_cols.npy')
     if self.is_train:
       # 컬럼 이름 저장
@@ -363,8 +358,7 @@ class DataLoader:
            (cur_date == end_date and cur_hourgrp >= end_hourgrp):
           # 끝까지 탐색함
           break
-            
-    self.demo = demographic_ary.copy()
+    print("len of keylist: ", len(key_list),"shape of measurement: ",self.measurement_df.shape)
 
     # 시간대 정보에 따라 데이터를 채워 넣는다
     demographic_idx = condition_idx = measurement_idx = 0
@@ -373,6 +367,7 @@ class DataLoader:
 
     data_cols = list(demographic_cols) + list(measurement_cols) + list(condition_cols)
     data_list = np.zeros((len(key_list), len(data_cols)), dtype=np.float32)
+
     for idx, row in enumerate(key_list):
       person_id, date, hourgrp = row
 
@@ -390,9 +385,7 @@ class DataLoader:
             pytz.utc) - demographic_row[1]
         demographic_gender = demographic_row[2]
         demographic_data = [demographic_age.total_seconds() // 3600., demographic_gender]
-        
 
-        
         state = 0       # 0: 다음 데이터 탐색 1: 맞는 데이터 찾음 2: 맞는 데이터 없음
         if demographic_person_id > person_id:       # 다음 환자로 넘어감
           state = 2
@@ -406,6 +399,8 @@ class DataLoader:
           break
         elif state == 2:                # 맞는 데이터가 없음
           break
+        #datalist복사
+        self.data_list1 = data_list.copy()
 
       # Measurement 탐색
       col_start_idx = col_end_idx
@@ -460,7 +455,7 @@ class DataLoader:
 
         state = 0       # 0: 다음 데이터 탐색 1: 맞는 데이터 찾음 2: 맞는 데이터 없음
         if condition_person_id > person_id:       # 다음 환자로 넘어감
-          state = 2
+          state = 3
         elif condition_person_id == person_id:
           if condition_date > date:               # 다음 날짜로 넘어감
             state = 2
@@ -479,6 +474,9 @@ class DataLoader:
           condition_idx += 1
           break
         elif state == 2:                # 맞는 데이터가 없음
+          data_list[idx, col_start_idx:col_end_idx] = prev_conditions
+          break
+        elif state == 3:
           break
 
       prev_person_id = person_id
@@ -495,7 +493,9 @@ class DataLoader:
     feature_key_df = self.feature_key_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=[True, False, False])
     feature_ary = self.feature_ary[feature_key_df.index]
     feature_key_ary = feature_key_df.values
-    
+
+    self.feacture = feature_ary.copy()
+
     cols = ['SUBJECT_ID', 'COHORT_END_DATE']
     if self.is_train:
       cols.append('LABEL')
@@ -595,32 +595,16 @@ class DataLoader:
       self.valid_x = self.x
       self.valid_y = self.y
 
-    train_x = pad_sequences(self.train_x, padding='post',value=np.nan, dtype='float32')
-    valid_x = pad_sequences(self.valid_x, padding='post',value=np.nan, dtype='float32')
+    self.train_x = pad_sequences(self.train_x, dtype=np.float32)
+    self.valid_x = pad_sequences(self.valid_x, dtype=np.float32)
 
-    self.train_x = self.scaling(train_x)
-    self.valid_x = self.scaling(valid_x)
-    
-    
-  def scaling(self, target):
-    #minmax scale
-    scaler = MinMaxScaler(feature_range=(-1,1))
-    target_shape = target.shape
-    
-    target = target.reshape(target_shape[0],-1)
-    target = scaler.fit_transform(target)
-    target = target.reshape(target_shape)
-    target = np.nan_to_num(target, nan =-5)
-    return target
-    
   def split_data(self):
     start_time = time.time()
     if self.is_train:
       self._train_split_data()
     else:
-      train_x = pad_sequences(self.x, padding='post',value=np.nan, dtype='float32')
-      self.train_x = self.scaling(train_x)
-    
+      self.train_x = pad_sequences(self.x)
+
     print("data_loader split_data time:", time.time() - start_time)
 
   def get_train_data(self):

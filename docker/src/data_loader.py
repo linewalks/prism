@@ -264,8 +264,7 @@ class DataLoader:
       # TODO
     group_cols = ['PERSON_ID', 'MEASUREMENT_DATE', 'MEASUREMENT_HOURGRP', 'MEASUREMENT_SOURCE_VALUE']
 
-    agg_list = ['count', 'min', 'max', 'mean', 'std', 'var',
-                'mad', 'prod', 'skew']
+    agg_list = ['count', 'min', 'max', 'mean', 'var']
     
     measurement_df['VALUE_DIFF'] = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.diff()
 
@@ -274,15 +273,15 @@ class DataLoader:
                                          columns='MEASUREMENT_SOURCE_VALUE', aggfunc=np.mean)
     measurement_diff_df.columns = pd.MultiIndex.from_tuples([('diff', v) for v in measurement_diff_df.columns])
 
-    measurement_kurt_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.apply(pd.DataFrame.kurt).unstack()
-    measurement_kurt_df.columns = pd.MultiIndex.from_tuples([('kurt', v) for v in measurement_kurt_df.columns])
+    measurement_df_ffill = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(['min','max','mean']).unstack()
+    measurement_df_ffill = measurement_df_ffill.fillna(method = 'ffill')
 
-    measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list).unstack()
-    measurement_df = pd.concat([measurement_df, measurement_diff_df, measurement_kurt_df], axis=1).reset_index().fillna(0)
+    measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(['count','var']).unstack()
+    measurement_df = pd.concat([measurement_df, measurement_diff_df, measurement_df_ffill], axis=1).reset_index().fillna(0)
 
     # 사용한 후 삭제
     del measurement_diff_df
-    del measurement_kurt_df
+    del measurement_df_ffill
 
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
     new_cols = []
@@ -335,6 +334,10 @@ class DataLoader:
     demographic_cols = ["AGE_HOUR", "GENDER"]
     condition_cols = self.condition_df.columns[3:]
     measurement_cols = self.measurement_df.columns[3:]
+
+    # self.measurement_df.to_csv('feature_measurement.csv')
+    # self.condition_df.to_csv('condition_measurement.csv')
+    # self.measurement_mean_df.to_csv('feature_measurement_mean.csv')
 
     # 빈 Time Range 없게 시간대 정보를 채움
     max_hourgrp = (24 // self.group_hour) - 1

@@ -45,7 +45,6 @@ callbacks = [
     ),
     EarlyStopping(monitor='val_loss', min_delta=0, patience=5,
                                    verbose=0, mode='auto')
-    )
 ]
 
 hist = model.train(data_loader.get_train_data(), data_loader.get_valid_data(),

@@ -6,7 +6,8 @@ import pytz
 from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+from keras.preprocessing.sequence import pad_sequences
+from sklearn.preprocessing import MinMaxScaler
 
 
 MEASUREMENT_SOURCE_VALUE_MAP = {
@@ -36,6 +37,12 @@ MEASUREMENT_SOURCE_VALUE_MAP = {
     "VTE": ["TV"],
     "VIT": ["TVin"]
 }
+VALUE_MAP = ['HR','RR','SpO2','Pulse','Temp','ABPm','ABPd','ABPs','NBPm','NBPs','NBPd','SPO2-%','SPO2-R',
+'Resp','PVC','ST-II','etCO2','SpO2 r','imCO2','ST-V1','ST-I','ST-III','ST-aVF','ST-aVL','ST-aVR',
+'awRR','CVPm','AoM','ST-V2','ST-V3','ST-V4','ST-V5','ST-V6','SpO2T','T1','TV','Cdyn','PEEP','RRaw',
+'TVin','inO2','AoD','AoS','InsTi','MINVOL','MnAwP','PIP','MVin','PB','Poccl','Pplat',
+'MV','Patm','Ppeak','Rinsp','ST-V','sInsTi','sPEEP','sTV','sTrig','sPSV','Rexp','highP',
+'sAPkFl','sAWRR','sFIO2','sPIF','sMV','sO2','sRisTi','ARTd','ARTm','ARTs','PAPm','sSIMV']
 
 MEASUREMENT_NORMALIZATION = ['mean', 'predefined']
 
@@ -169,6 +176,9 @@ class DataLoader:
 
       # 맵핑이된 정보만 남긴다
       measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
+
+    measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(VALUE_MAP)]
+
 
     # 컬럼 타입 설정
     measurement_df.MEASUREMENT_DATETIME = pd.to_datetime(measurement_df.MEASUREMENT_DATETIME, utc=True)
@@ -399,7 +409,7 @@ class DataLoader:
           break
         elif state == 2:                # 맞는 데이터가 없음
           break
-        
+
       # Measurement 탐색
       col_start_idx = col_end_idx
       col_end_idx += len(measurement_cols)

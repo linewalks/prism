@@ -4,3 +4,4 @@ pytest
 scikit-learn
 dotmap
 numpy==1.18.1
+keras

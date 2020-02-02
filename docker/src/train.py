@@ -5,7 +5,7 @@ import pandas as pd
 
 from data_loader import DataLoader
 from model import SimpleRNNModel
-from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 from sklearn.metrics import f1_score, roc_auc_score, recall_score, precision_score
 
 try:
@@ -38,13 +38,13 @@ model = SimpleRNNModel(data_loader)
 callbacks = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
                     monitor='val_loss',
-                    checkpoint_mode='min',
+                    mode='min',
                     save_best_only=False,
                     save_weights_only=False,
                     verbose=True
     ),
-    TensorBoard(log_dir=task_log_path,
-                write_graph=True
+    EarlyStopping(monitor='val_loss', min_delta=0, patience=5,
+                                   verbose=0, mode='auto')
     )
 ]
 
@@ -60,7 +60,7 @@ for idx in range(len(hist.history['loss'])):
   log_list = [str(idx+1)]
   for key in keys:
     log_list.append("%.4f" % hist.history[key][idx])
-  
+
   print("\t".join(log_list))
 
 def print_score(data_x, data_y, data_type):
@@ -83,7 +83,7 @@ def print_score(data_x, data_y, data_type):
   print("Best", data_type, "F1 Recall", score_recall)
   print("Best", data_type, "F1 Threshold", thr)
   print(data_type, "AUROC", score_auroc)
-  
+
   if score_auroc + score_f1 == 0:
     score = 0
   else:

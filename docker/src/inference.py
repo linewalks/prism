@@ -26,7 +26,9 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'test'),
 model = SimpleRNNModel(data_loader)
 
 # 모델 로드
+print(task_path)
 model.load(task_path)
+print(model.model.summary())
 
 # threhshold
 f1_list = np.load(os.path.join(task_path, 'f1.npy'))

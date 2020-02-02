@@ -45,8 +45,9 @@ class SimpleRNNModel:
         file_name = sorted([file_name for file_name in os.listdir(
             path) if file_name.endswith('.hdf5')])[-1]
         model_path = os.path.join(path, file_name)
-
-        self.model = self.model.load_weights(model_path)
+        print(model_path)
+        
+        self.model.load_weights(model_path)
 
     def train(self, train_data, valid_data, epochs=10, verbose=0, batch_size=32, callbacks=[]):
         return self.model.fit(train_data[0], train_data[1],

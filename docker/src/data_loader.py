@@ -399,9 +399,7 @@ class DataLoader:
           break
         elif state == 2:                # 맞는 데이터가 없음
           break
-        #datalist복사
-        self.data_list1 = data_list.copy()
-
+        
       # Measurement 탐색
       col_start_idx = col_end_idx
       col_end_idx += len(measurement_cols)
@@ -493,8 +491,6 @@ class DataLoader:
     feature_key_df = self.feature_key_df.sort_values(['PERSON_ID', 'DATE', 'HOURGRP'], ascending=[True, False, False])
     feature_ary = self.feature_ary[feature_key_df.index]
     feature_key_ary = feature_key_df.values
-
-    self.feacture = feature_ary.copy()
 
     cols = ['SUBJECT_ID', 'COHORT_END_DATE']
     if self.is_train:

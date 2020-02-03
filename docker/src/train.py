@@ -49,7 +49,7 @@ callbacks = [
 
 hist = model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
-            epochs=10, batch_size=32,
+            epochs=100, batch_size=32,
             callbacks=callbacks)
 
 keys = hist.history.keys()

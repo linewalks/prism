@@ -73,6 +73,7 @@ class DataLoader:
                group_hour=1, timestep_per_data=128,
                measurement_normalize='mean',
                condition_min_limit=0, condition_group=False,
+               autoencoder = False,
                valid_size=0.2, data_split_random_seed=1235, pytest=False):
     self.data_path = data_path
     self.common_path = common_path
@@ -81,13 +82,13 @@ class DataLoader:
 
     self.group_hour = group_hour
     self.timestep_per_data = timestep_per_data
-
+    
     assert measurement_normalize in MEASUREMENT_NORMALIZATION
     self.measurement_normalize = measurement_normalize
 
     self.condition_min_limit = condition_min_limit
     self.condition_group = condition_group
-
+    self.autoencoder = autoencoder
     self.valid_size = valid_size
     self.data_split_random_seed = data_split_random_seed
     if not pytest:
@@ -293,11 +294,13 @@ class DataLoader:
 #     measurement_kurt_df.columns = pd.MultiIndex.from_tuples([('kurt', v) for v in measurement_kurt_df.columns])
 
     measurement_df = measurement_df.groupby(group_cols).VALUE_AS_NUMBER.agg(agg_list).unstack()
-    measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index().fillna(0)
+    measurement_df = pd.concat([measurement_df, measurement_diff_df], axis=1).reset_index().ffill().bfill().fillna(0)
 
     # 사용한 후 삭제
     del measurement_diff_df
 #     del measurement_kurt_df
+
+
 
     # 컬럼 이름 정제 (그룹화 하기 쉽게)
     new_cols = []
@@ -311,7 +314,7 @@ class DataLoader:
             new_cols.append((col[1][0]+"diff",col[1][1]))
     measurement_df.columns = new_cols
 
-#     self.diffe = measurement_df
+
     measurement_df = measurement_df.rename(columns={'MEASUREMENT_DATE': 'DATE',
                                                     'MEASUREMENT_HOURGRP': 'HOURGRP'})
 

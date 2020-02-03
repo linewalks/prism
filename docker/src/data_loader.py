@@ -11,38 +11,47 @@ from sklearn.preprocessing import MinMaxScaler
 
 
 MEASUREMENT_SOURCE_VALUE_MAP = {
-    "IDBP": ["ARTd", "ABPd"],
+    "IDBP": ["ABPd"],
     "IMBP": ["ABPm"],
-    "ISBP": ["ARTs", "ABPs"],
+    "ISBP": ["ABPs"],
     "FDBP": ["AoD"],
-    "FMBP": ["AoS"],
+    "FMBP": ["AoM"],
     "FSBP": ["AoS"],
-    "BT": ["Tskin", "Trect", "Tnaso", "Tesoph", "Temp", "Tcore"],
+    "BT": ["Temp"],
     "CVP": ["CVPm"],
     "ETCO2": ["etCO2"],
     "PR": ["HR", "Pulse"],
-    "LAP": ["LAPm"],
-    "MINUTE_VOLUME": ["MINVOL", "MV"],
-    "PMEAN": ["MnAwP", "Pmean"],
-    "DBP": ["NBPd", "NBP-D"],
-    "MBP": ["NBPm", "NBP-M"],
-    "SBP": ["NBPs", "NBP-S"],
-    "DPAP": ["PAPd", "Pd"],
-    "MPAP": ["PAPm", "Pm"],
+    "MINVOL": ["MINVOL"],
+    "MV" : ["MV"],
+    "PMEAN": ["MnAwP"],
+    "DBP": ["NBPd"],
+    "MBP": ["NBPm"],
+    "SBP": ["NBPs"],
+    "MPAP": ["PAPm"],
     "SPAP": ["PAPs", "Ps"],
     "PPEAK": ["PIP", "Ppeak"],
     "RR": ["RR, Resp"],
+    "Rinsp": ["Rinsp"],
+    "Rexp":["Rexp"],
     "FREQ_MEASURE": ["RRaw"],
-    "SPO2": ["SpO2T", "SpO2-%", "SpO2"],
+    "SPO2": ["SpO2T", "SpO2-%", "SpO2","SPO2-r"],
     "VTE": ["TV"],
-    "VIT": ["TVin"]
+    "VIT": ["TVin"],
+    "PEEP": ["PEEP"],
+    'ST-I'  :['ST-I'],
+    'ST-II' :['ST-II'],
+    'ST-III':['ST-III'],
+    'sTrig' :['sTrig'],
+    'sTV'   :['sTV'],
+    'ST-V'  :['ST-V'],
+    'ST-V1' :['ST-V1'],
+    'ST-V2' :['ST-V2'],
+    'ST-V3' :['ST-V3'],
+    'ST-V4' :['ST-V4'],
+    'ST-V5' :['ST-V5'],
+    'ST-V6' :['ST-V6']
 }
-VALUE_MAP = ['HR','RR','SpO2','Pulse','Temp','ABPm','ABPd','ABPs','NBPm','NBPs','NBPd','SPO2-%','SPO2-R',
-'Resp','PVC','ST-II','etCO2','SpO2 r','imCO2','ST-V1','ST-I','ST-III','ST-aVF','ST-aVL','ST-aVR',
-'awRR','CVPm','AoM','ST-V2','ST-V3','ST-V4','ST-V5','ST-V6','SpO2T','T1','TV','Cdyn','PEEP','RRaw',
-'TVin','inO2','AoD','AoS','InsTi','MINVOL','MnAwP','PIP','MVin','PB','Poccl','Pplat',
-'MV','Patm','Ppeak','Rinsp','ST-V','sInsTi','sPEEP','sTV','sTrig','sPSV','Rexp','highP',
-'sAPkFl','sAWRR','sFIO2','sPIF','sMV','sO2','sRisTi','ARTd','ARTm','ARTs','PAPm','sSIMV']
+
 
 MEASUREMENT_NORMALIZATION = ['mean', 'predefined']
 
@@ -166,19 +175,16 @@ class DataLoader:
                                  usecols=['PERSON_ID', 'MEASUREMENT_DATETIME',
                                           'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']
                                  )
-    # if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
-    #   # source_value 맵핑
-    #   source_value_invert_map = {}
-    #   for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
-    #     for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
-    #       source_value_invert_map[table_value] = new_value
-    #   measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
-    #
-    #   # 맵핑이된 정보만 남긴다
-    #   measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
+    if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
+      # source_value 맵핑
+      source_value_invert_map = {}
+      for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
+        for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
+          source_value_invert_map[table_value] = new_value
+      measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
 
-    measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(VALUE_MAP)]
-    self.measure = measurement_df
+      # 맵핑이된 정보만 남긴다
+      measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
 
     # 컬럼 타입 설정
     measurement_df.MEASUREMENT_DATETIME = pd.to_datetime(measurement_df.MEASUREMENT_DATETIME, utc=True)

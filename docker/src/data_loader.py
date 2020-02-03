@@ -166,19 +166,19 @@ class DataLoader:
                                  usecols=['PERSON_ID', 'MEASUREMENT_DATETIME',
                                           'MEASUREMENT_SOURCE_VALUE', 'VALUE_AS_NUMBER']
                                  )
-    if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
-      # source_value 맵핑
-      source_value_invert_map = {}
-      for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
-        for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
-          source_value_invert_map[table_value] = new_value
-      measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
+    # if self.measurement_normalize == MEASUREMENT_NORMALIZATION[0]:
+    #   # source_value 맵핑
+    #   source_value_invert_map = {}
+    #   for new_value in MEASUREMENT_SOURCE_VALUE_MAP:
+    #     for table_value in MEASUREMENT_SOURCE_VALUE_MAP[new_value]:
+    #       source_value_invert_map[table_value] = new_value
+    #   measurement_df.MEASUREMENT_SOURCE_VALUE = measurement_df.MEASUREMENT_SOURCE_VALUE.replace(source_value_invert_map)
+    #
+    #   # 맵핑이된 정보만 남긴다
+    #   measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
 
-      # 맵핑이된 정보만 남긴다
-      measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(MEASUREMENT_SOURCE_VALUE_MAP.keys())]
-
-#     measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(VALUE_MAP)]
-
+    measurement_df = measurement_df[measurement_df.MEASUREMENT_SOURCE_VALUE.isin(VALUE_MAP)]
+    self.measure = measurement_df
 
     # 컬럼 타입 설정
     measurement_df.MEASUREMENT_DATETIME = pd.to_datetime(measurement_df.MEASUREMENT_DATETIME, utc=True)

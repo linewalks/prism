@@ -19,9 +19,9 @@ class SimpleRNNModel:
     def build_model(self):
 
         model_input = Input(shape=(None, self.data_loader.train_x.shape[2]))
-        x = layers.Masking(mask_value=-1)(model_input)
+        x = layers.Masking(mask_value=-5)(model_input)
 
-        rnn_layers = [64,32]
+        rnn_layers = [32]
         for idx, node in enumerate(rnn_layers):
             return_sequences = False if idx == len(rnn_layers) - 1 else True
 
@@ -33,7 +33,7 @@ class SimpleRNNModel:
 
         loss = 'binary_crossentropy'
 
-        optimizer = adam(lr=0.0003)
+        optimizer = adam(lr=0.001)
 
         model = Model(model_input, model_output)
         model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])

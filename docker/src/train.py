@@ -5,7 +5,7 @@ import pandas as pd
 
 from data_loader import DataLoader
 from model import SimpleRNNModel, Autoencoder
-from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from sklearn.metrics import f1_score, roc_auc_score, recall_score, precision_score
 
 try:
@@ -77,7 +77,8 @@ callbacks2 = [
                     verbose=True
     ),
     EarlyStopping(monitor='val_loss', min_delta=0, patience=5,
-                                   verbose=0, mode='auto')
+                                   verbose=0, mode='auto'),
+    TensorBoard(log_dir=task_log_path, write_graph=True)
 ]
 
 hist = model.train(data_loader2.get_train_data(), data_loader2.get_valid_data(),

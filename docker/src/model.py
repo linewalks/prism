@@ -1,7 +1,7 @@
 import os
 from keras.optimizers import RMSprop, adam
 from keras.callbacks import History
-from keras.layers import Input, Dense, GRU
+from keras.layers import Input, Dense, GRU, Dropout
 from keras.models import Model
 from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
@@ -43,7 +43,7 @@ class SimpleRNNModel:
     def load(self, path):
 
         file_name = sorted([file_name for file_name in os.listdir(
-            path) if file_name.endswith('.hdf5')])[-1]
+            path) if file_name.endswith('.hdf5') and file_name.startswith('model')])[-1]
         model_path = os.path.join(path, file_name)
         print(model_path)
 
@@ -69,18 +69,18 @@ class Autoencoder:
 
     def build_model(self):
 
-        model_input = Input(shape=(None, self.measurement_df.shape[1]))
-        encoder1 = layers.Dense(64,activation = 'tanh')(model_input)
-        encoder2 = layers.Dropout(0.5)(encoder1)
-        encoder3 = layers.Dense(64, activation = 'tanh')(encoder2)
-        encoder4 = layers.Dense(32, activation='relu')(encoder3)
-        decoder1 = layers.Dense(64, activation = 'tanh')(encoder4)
-        decoder2 = layer.Dropout(0.5)(decoder1)
-        decoder3 = layers.Dense(self.measurement_df.shape[1])(decoder2)
+        model_input = Input(shape=(self.measurement_df.shape[1],))
+        encoder1 = Dense(256,activation = 'tanh')(model_input)
+        encoder2 = Dropout(0.5)(encoder1)
+        encoder3 = Dense(196, activation = 'tanh')(encoder2)
+        encoder4 = Dense(128, activation='relu')(encoder3)
+        decoder1 = Dense(256, activation = 'tanh')(encoder4)
+        decoder2 = Dropout(0.5)(decoder1)
+        decoder3 = Dense(self.measurement_df.shape[1])(decoder2)
 
         autoencoder = Model(model_input, decoder3)
 
-        optimizer = adam(lr=0.001)
+        optimizer = adam(lr=0.003)
 
         autoencoder.compile(loss='mean_squared_error', optimizer=optimizer, metrics=['mean_squared_error'])
 
@@ -105,7 +105,7 @@ class Autoencoder:
                               )
 
     def predict(self, infer_x, batch_size=None):
-        model_input = Input(shape = (None, self.measurement_df.shape[1]))
+        model_input = Input(shape = (infer_x.shape[1],))
         layer1 = self.model.layers[1]
         layer2 = self.model.layers[2]
         layer3 = self.model.layers[3]

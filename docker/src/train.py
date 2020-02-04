@@ -37,8 +37,8 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
                          autoencoder =True,
                          task_path=task_path)
 
-auto_model = Autoencoder(data_loader.measure_auto)
-print("measurement_df shape: ", data_loader.measure_auto.shape)
+auto_model = Autoencoder(data_loader.train_measure)
+print("measurement_df shape: ", data_loader.train_measure.shape)
 
 callbacks1 = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'encoder-{epoch:02d}-{val_loss:2f}.hdf5'),
@@ -51,23 +51,23 @@ callbacks1 = [
     EarlyStopping(monitor='val_loss', min_delta=0, patience=5,
                                    verbose=0, mode='auto')
 ]
-auto_model.train(data_loader.measure_auto, data_loader.measure_auto,
+auto_model.train(data_loader.train_measure, data_loader.valid_measure,
             verbose=0,
-            epochs=100, batch_size=32,
+            epochs=500, batch_size=600,
             callbacks=callbacks1)
 
-data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
+del data_loader
+del auto_model
+del callbacks1
+
+# auto_model.predict(data_loader.measure_auto)
+data_loader2 = DataLoader(data_path=os.path.join(data_path, 'train'),
                          common_path=os.path.join(data_path, 'volume'),
                          autoencoder =False,
                          task_path=task_path)
 
-# auto_model.predict(data_loader.measure_auto)
-
-data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
-                         common_path=os.path.join(data_path, 'volume'),
-                         task_path=task_path)
-model = SimpleRNNModel(data_loader)
-print("train_x shape: ",data_loader.train_x.shape)
+model = SimpleRNNModel(data_loader2)
+print("train_x shape: ",data_loader2.train_x.shape)
 callbacks2 = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
                     monitor='val_loss',
@@ -80,7 +80,7 @@ callbacks2 = [
                                    verbose=0, mode='auto')
 ]
 
-hist = model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
+hist = model.train(data_loader2.get_train_data(), data_loader2.get_valid_data(),
             verbose=0,
             epochs=100, batch_size=32,
             callbacks=callbacks2)
@@ -125,8 +125,8 @@ def print_score(data_x, data_y, data_type):
   return f1_list, thr_list
 
 
-train_x, train_y = data_loader.get_train_data()
-valid_x, valid_y = data_loader.get_valid_data()
+train_x, train_y = data_loader2.get_train_data()
+valid_x, valid_y = data_loader2.get_valid_data()
 
 train_f1, train_thr = print_score(train_x, train_y, 'Train')
 valid_f1, valid_thr = print_score(valid_x, valid_y, 'Valid')

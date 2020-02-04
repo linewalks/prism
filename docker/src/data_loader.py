@@ -3,11 +3,13 @@ import time
 import numpy as np
 import pandas as pd
 import pytz
+import sys
 from measurement_stat import MEASUREMENT_SOURCE_VALUE_STATS
 from datetime import datetime, timedelta, time as datetime_time, timezone
 from sklearn.model_selection import train_test_split
 from keras.preprocessing.sequence import pad_sequences
 from sklearn.preprocessing import MinMaxScaler
+from model import Autoencoder
 
 
 MEASUREMENT_SOURCE_VALUE_MAP = {
@@ -73,7 +75,7 @@ class DataLoader:
                  group_hour=1, timestep_per_data=128,
                  measurement_normalize='mean',
                  condition_min_limit=0, condition_group=False,
-                 autoencoder=False,
+                 autoencoder=False, predicted_set = [],
                  valid_size=0.2, data_split_random_seed=1235, pytest=False):
         self.data_path = data_path
         self.common_path = common_path
@@ -89,6 +91,7 @@ class DataLoader:
         self.condition_min_limit = condition_min_limit
         self.condition_group = condition_group
         self.autoencoder = autoencoder
+        self.predicted_set = predicted_set
         self.valid_size = valid_size
         self.data_split_random_seed = data_split_random_seed
         if not pytest:
@@ -104,10 +107,10 @@ class DataLoader:
         self.person_df = self.extract_person()
         self.condition_df = self.extract_condition()
         self.measurement_df = self.extract_measurement()
-
+        # 데이터를 시간대별로 Group
+        self.groupby_hour()
         if not self.autoencoder:
-            # 데이터를 시간대별로 Group
-            self.groupby_hour()
+
 
             # 환자별 시간 시퀀스 데이터를 만듦
             self.make_person_sequence()
@@ -370,10 +373,17 @@ class DataLoader:
               time.time() - start_time)
 
         if self.autoencoder:
-            self.measure_auto = measurement_df.iloc[:, 3:]
-        # else:
-        #     embed = auto_model.predict(measurement_df.iloc[:,3:])
-        #     embed
+            train_measure, valid_measure = train_test_split(measurement_df.iloc[:, 3:],
+                                                                  test_size=self.valid_size)
+
+            self.train_measure = train_measure
+            self.valid_measure = valid_measure
+        else:
+            auto_model = Autoencoder(measurement_df.iloc[:,3:])
+            auto_model.load(self.task_path)
+            embedded = auto_model.predict(measurement_df.iloc[:,3:])
+            measurement_df = pd.concat([measurement_df.iloc[:,:3], pd.DataFrame(embedded)],axis=1)
+            
         return measurement_df
 
     def make_person_sequence(self):

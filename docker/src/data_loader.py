@@ -372,6 +372,9 @@ class DataLoader:
         print("data_loader groupby_hour_measurement time:",
               time.time() - start_time)
 
+        scaler = MinMaxScaler(feature_range=(-1,1))
+        measurement_df.iloc[:, 3:] = scaler.fit_transform(measurement_df.iloc[:, 3:])
+
         if self.autoencoder:
             train_measure, valid_measure = train_test_split(measurement_df.iloc[:, 3:],
                                                                   test_size=self.valid_size)
@@ -383,7 +386,7 @@ class DataLoader:
             auto_model.load(self.task_path)
             embedded = auto_model.predict(measurement_df.iloc[:,3:])
             measurement_df = pd.concat([measurement_df.iloc[:,:3], pd.DataFrame(embedded)],axis=1)
-            
+
         return measurement_df
 
     def make_person_sequence(self):
@@ -678,9 +681,9 @@ class DataLoader:
             self.valid_y = self.y
 
         self.train_x = pad_sequences(
-            self.train_x, dtype=np.float32, padding='post')
+            self.train_x, dtype=np.float32, padding='post', value = -5)
         self.valid_x = pad_sequences(
-            self.valid_x, dtype=np.float32, padding='post')
+            self.valid_x, dtype=np.float32, padding='post', value = -5)
 
     def split_data(self):
         start_time = time.time()

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from data_loader import DataLoader
-from model import SimpleRNNModel
+from model import SimpleRNNModel, Autoencoder
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from sklearn.metrics import f1_score, roc_auc_score, recall_score, precision_score
 
@@ -30,12 +30,45 @@ if not os.path.exists(task_log_path):
 
 print("Train Start")
 
+#Autoencoding
+
+data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
+                         common_path=os.path.join(data_path, 'volume'),
+                         autoencoder =True,
+                         task_path=task_path)
+
+auto_model = Autoencoder(data_loader.measure_auto)
+print("measurement_df shape: ", data_loader.measure_auto.shape)
+
+callbacks1 = [
+    ModelCheckpoint(filepath=os.path.join(task_path, 'encoder-{epoch:02d}-{val_loss:2f}.hdf5'),
+                    monitor='val_loss',
+                    mode='min',
+                    save_best_only=False,
+                    save_weights_only=False,
+                    verbose=True
+    ),
+    EarlyStopping(monitor='val_loss', min_delta=0, patience=5,
+                                   verbose=0, mode='auto')
+]
+auto_model.train(data_loader.measure_auto, data_loader.measure_auto,
+            verbose=0,
+            epochs=100, batch_size=32,
+            callbacks=callbacks1)
+
+data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
+                         common_path=os.path.join(data_path, 'volume'),
+                         autoencoder =False,
+                         task_path=task_path)
+
+# auto_model.predict(data_loader.measure_auto)
+
 data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
                          common_path=os.path.join(data_path, 'volume'),
                          task_path=task_path)
 model = SimpleRNNModel(data_loader)
 print("train_x shape: ",data_loader.train_x.shape)
-callbacks = [
+callbacks2 = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
                     monitor='val_loss',
                     mode='min',
@@ -50,7 +83,7 @@ callbacks = [
 hist = model.train(data_loader.get_train_data(), data_loader.get_valid_data(),
             verbose=0,
             epochs=100, batch_size=32,
-            callbacks=callbacks)
+            callbacks=callbacks2)
 
 keys = hist.history.keys()
 print_keys = [key.replace('val_', 'v_') for key in (['epoch'] + list(keys))]

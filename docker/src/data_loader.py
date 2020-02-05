@@ -382,17 +382,17 @@ class DataLoader:
         scaler = MinMaxScaler(feature_range=(-1,1))
         measurement_df.iloc[:, 3:] = scaler.fit_transform(measurement_df.iloc[:, 3:])
 
-        if self.autoencoder:
-            train_measure, valid_measure = train_test_split(measurement_df.iloc[:, 3:],
-                                                                  test_size=self.valid_size)
+#         if self.autoencoder:
+#             train_measure, valid_measure = train_test_split(measurement_df.iloc[:, 3:],
+#                                                                   test_size=self.valid_size)
 
-            self.train_measure = train_measure
-            self.valid_measure = valid_measure
-        else:
-            auto_model = Autoencoder(measurement_df.iloc[:,3:])
-            auto_model.load(self.task_path)
-            embedded = auto_model.predict(measurement_df.iloc[:,3:])
-            measurement_df = pd.concat([measurement_df.iloc[:,:3], pd.DataFrame(embedded)],axis=1)
+#             self.train_measure = train_measure
+#             self.valid_measure = valid_measure
+#         else:
+#             auto_model = Autoencoder(measurement_df.iloc[:,3:])
+#             auto_model.load(self.task_path)
+#             embedded = auto_model.predict(measurement_df.iloc[:,3:])
+#             measurement_df = pd.concat([measurement_df.iloc[:,:3], pd.DataFrame(embedded)],axis=1)
 
         return measurement_df
 

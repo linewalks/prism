@@ -32,33 +32,33 @@ print("Train Start")
 
 #Autoencoding
 
-data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
-                         common_path=os.path.join(data_path, 'volume'),
-                         autoencoder =True,
-                         task_path=task_path)
+# data_loader = DataLoader(data_path=os.path.join(data_path, 'train'),
+#                          common_path=os.path.join(data_path, 'volume'),
+#                          autoencoder =True,
+#                          task_path=task_path)
 
-auto_model = Autoencoder(data_loader.train_measure)
-print("measurement_df shape: ", data_loader.train_measure.shape)
+# auto_model = Autoencoder(data_loader.train_measure)
+# print("measurement_df shape: ", data_loader.train_measure.shape)
 
-callbacks1 = [
-    ModelCheckpoint(filepath=os.path.join(task_path, 'encoder-{epoch:02d}-{val_loss:2f}.hdf5'),
-                    monitor='val_loss',
-                    mode='min',
-                    save_best_only=False,
-                    save_weights_only=False,
-                    verbose=True
-    ),
-    EarlyStopping(monitor='val_loss', min_delta=0, patience=5,
-                                   verbose=0, mode='auto')
-]
-auto_model.train(data_loader.train_measure, data_loader.valid_measure,
-            verbose=0,
-            epochs=500, batch_size=600,
-            callbacks=callbacks1)
+# callbacks1 = [
+#     ModelCheckpoint(filepath=os.path.join(task_path, 'encoder-{epoch:02d}-{val_loss:2f}.hdf5'),
+#                     monitor='val_loss',
+#                     mode='min',
+#                     save_best_only=True,
+#                     save_weights_only=False,
+#                     verbose=True
+#     ),
+#     EarlyStopping(monitor='val_loss', min_delta=0, patience=5,
+#                                    verbose=0, mode='auto')
+# ]
+# auto_model.train(data_loader.train_measure, data_loader.valid_measure,
+#             verbose=0,
+#             epochs=500, batch_size=600,
+#             callbacks=callbacks1)
 
-del data_loader
-del auto_model
-del callbacks1
+# del data_loader
+# del auto_model
+# del callbacks1
 
 # auto_model.predict(data_loader.measure_auto)
 data_loader2 = DataLoader(data_path=os.path.join(data_path, 'train'),
@@ -72,7 +72,7 @@ callbacks2 = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),
                     monitor='val_loss',
                     mode='min',
-                    save_best_only=False,
+                    save_best_only=True,
                     save_weights_only=False,
                     verbose=True
     ),
@@ -83,7 +83,7 @@ callbacks2 = [
 
 hist = model.train(data_loader2.get_train_data(), data_loader2.get_valid_data(),
             verbose=0,
-            epochs=100, batch_size=32,
+            epochs=100, batch_size=200,
             callbacks=callbacks2)
 
 keys = hist.history.keys()

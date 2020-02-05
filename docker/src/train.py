@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from data_loader import DataLoader
-from model import SimpleRNNModel, Autoencoder
+from model import SimpleRNNModel, Autoencoder, ConcatRNN
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from sklearn.metrics import f1_score, roc_auc_score, recall_score, precision_score
 
@@ -66,7 +66,8 @@ data_loader2 = DataLoader(data_path=os.path.join(data_path, 'train'),
                          autoencoder =False,
                          task_path=task_path)
 
-model = SimpleRNNModel(data_loader2)
+# model = SimpleRNNModel(data_loader2)
+model = ConcatRNN(data_loader2)
 print("train_x shape: ",data_loader2.train_x.shape)
 callbacks2 = [
     ModelCheckpoint(filepath=os.path.join(task_path, 'model-{epoch:02d}-{val_loss:2f}.hdf5'),

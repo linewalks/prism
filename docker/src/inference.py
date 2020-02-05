@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from data_loader import DataLoader
-from model import SimpleRNNModel
+from model import SimpleRNNModel, ConcatRNN
 
 try:
     data_path = sys.argv[1]
@@ -23,7 +23,8 @@ data_loader = DataLoader(data_path=os.path.join(data_path, 'test'),
                          common_path=os.path.join(data_path, 'volume'),
                          task_path=task_path,
                          is_train=False)
-model = SimpleRNNModel(data_loader)
+# model = SimpleRNNModel(data_loader)
+model = ConcatRNN(data_loader)
 
 # 모델 로드
 print(task_path)

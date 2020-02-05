@@ -114,3 +114,55 @@ class Autoencoder:
         encoder= Model(model_input, layer4(layer3(layer2(layer1(model_input)))))
 
         return encoder.predict(infer_x, batch_size=batch_size)
+
+class ConcatRNN:
+    def __init__(self, data_loader):
+        self.data_loader = data_loader
+
+        self.build_model()
+
+    def build_model(self):
+
+        model_input = Input(shape=(None, self.data_loader.train_x.shape[2]))
+        x = layers.Masking(mask_value=-5)(model_input)
+
+        gru = layers.GRU(64, activation='tanh',
+                           return_sequences=False)(x)
+        gru2 = layers.Dropout(0.3)(gru)
+        lstm = layers.LSTM(64, activation='tanh',
+                           return_sequences=False)(x)
+        lstm2 = layers.Dropout(0.3)(lstm)
+        
+        concatenated = layers.concatenate([gru2, lstm2],axis=1)
+        
+        model_output = Dense(1, activation='sigmoid')(concatenated)
+
+        loss = 'binary_crossentropy'
+
+        optimizer = adam(lr=0.001)
+
+        model = Model(model_input, model_output)
+        model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
+
+        self.model = model
+
+    def load(self, path):
+
+        file_name = sorted([file_name for file_name in os.listdir(
+            path) if file_name.endswith('.hdf5') and file_name.startswith('model')])[-1]
+        model_path = os.path.join(path, file_name)
+        print(model_path)
+
+        self.model.load_weights(model_path)
+
+    def train(self, train_data, valid_data, epochs=10, verbose=0, batch_size=32, callbacks=[]):
+        return self.model.fit(train_data[0], train_data[1],
+                              epochs=epochs,
+                              verbose=verbose,
+                              batch_size=batch_size,
+                              validation_data=valid_data,
+                              callbacks=callbacks
+                              )
+
+    def predict(self, infer_x, batch_size=None):
+        return self.model.predict(infer_x, batch_size=batch_size)

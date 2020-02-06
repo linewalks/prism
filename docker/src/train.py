@@ -77,14 +77,14 @@ callbacks2 = [
                     save_weights_only=False,
                     verbose=True
     ),
-    EarlyStopping(monitor='val_loss', min_delta=0, patience=5,
+    EarlyStopping(monitor='val_loss', min_delta=0, patience=20,
                                    verbose=0, mode='auto'),
     TensorBoard(log_dir=task_log_path, write_graph=True)
 ]
 
 hist = model.train(data_loader2.get_train_data(), data_loader2.get_valid_data(),
             verbose=0,
-            epochs=100, batch_size=200,
+            epochs=100, batch_size=3000,
             callbacks=callbacks2)
 
 keys = hist.history.keys()

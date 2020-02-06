@@ -139,7 +139,7 @@ class ConcatRNN:
 
         loss = 'binary_crossentropy'
 
-        optimizer = adam(lr=0.001)
+        optimizer = adam(lr=0.00001)
 
         model = Model(model_input, model_output)
         model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])

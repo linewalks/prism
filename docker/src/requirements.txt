@@ -1,4 +1,4 @@
-pip==19.3
+pip==21.1
 pandas
 pytest
 scikit-learn
